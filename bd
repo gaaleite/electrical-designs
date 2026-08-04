@@ -1,0 +1,57 @@
+-- 1. CATÁLOGO DE FABRICANTES (Cadastro de Componentes Comerciais)
+CREATE TABLE catalogo_componentes (
+    id SERIAL PRIMARY KEY,
+    fabricante VARCHAR(100) NOT NULL,
+    modelo VARCHAR(100) NOT NULL UNIQUE,
+    descricao TEXT,
+    categoria VARCHAR(50), -- Ex: 'Contator', 'Disjuntor', 'CLP'
+    dimensao_largura_mm NUMERIC(6,2) NOT NULL,
+    dimensao_altura_mm NUMERIC(6,2) NOT NULL,
+    dimensao_profundidade_mm NUMERIC(6,2) NOT NULL,
+    imagem_simbolo_svg TEXT -- Caminho ou string do desenho base do componente
+);
+
+-- 2. CADASTRO DE PINOS DO CATÁLOGO (Quais bornes esse modelo possui)
+CREATE TABLE catalogo_pinos (
+    id SERIAL PRIMARY KEY,
+    catalogo_id INT REFERENCES catalogo_componentes(id) ON DELETE CASCADE,
+    nome_pino VARCHAR(10) NOT NULL, -- Ex: 'A1', 'A2', '1', '2', 'L1'
+    tipo_sinal VARCHAR(30), -- Ex: 'Potencia', 'Comando', 'Terra', 'VDC'
+    posicao_relativa_x NUMERIC(5,2), -- Onde o pino fica desenhado dentro do símbolo (0.0 a 1.0)
+    posicao_relativa_y NUMERIC(5,2),
+    UNIQUE(catalogo_id, nome_pino)
+);
+
+-- 3. COMPONENTES DO PROJETO (Os itens que o usuário colocou no circuito)
+CREATE TABLE componentes_projeto (
+    id SERIAL PRIMARY KEY,
+    projeto_id INT NOT NULL, -- Identificador do projeto do usuário
+    tag VARCHAR(20) NOT NULL, -- Ex: 'K1', 'F1', 'Q1' (Identificação elétrica)
+    catalogo_id INT REFERENCES catalogo_componentes(id),
+    -- Coordenadas calculadas pelo seu algoritmo de Layout Físico
+    layout_x NUMERIC(8,2) DEFAULT 0.0,
+    layout_y NUMERIC(8,2) DEFAULT 0.0,
+    layout_trilho_id INT -- Identifica em qual trilho DIN do painel ele foi alocado
+);
+
+-- 4. A NETLIST / CONEXÕES (Os fios do circuito)
+CREATE TABLE conexoes_fios (
+    id SERIAL PRIMARY KEY,
+    projeto_id INT NOT NULL,
+    
+    -- Origem da conexão
+    componente_origem_id INT REFERENCES componentes_projeto(id) ON DELETE CASCADE,
+    pino_origem VARCHAR(10) NOT NULL,
+    
+    -- Destino da conexão
+    componente_destino_id INT REFERENCES componentes_projeto(id) ON DELETE CASCADE,
+    pino_destino VARCHAR(10) NOT NULL,
+    
+    -- Propriedades do Fio/Cabo
+    bitola_mm2 NUMERIC(4,2) DEFAULT 1.5,
+    cor_fio VARCHAR(20) DEFAULT 'Azul',
+    tag_fio VARCHAR(50), -- Identificação da anilha do fio
+    
+    -- Dados para o algoritmo de roteamento desenhar as linhas
+    caminho_geometria_json JSONB -- Guarda os pontos [x,y] por onde a linha do diagrama deve passar
+);
