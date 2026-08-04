@@ -1,0 +1,22 @@
+[
+  {
+    "projeto_id": 101,
+    "componente_origem_id": 45,
+    "pino_origem": "2",
+    "componente_destino_id": 46,
+    "pino_destino": "1",
+    "bitola_mm2": 2.5,
+    "cor_fio": "Preto",
+    "caminho_geometria_json": null
+  },
+  {
+    "projeto_id": 101,
+    "componente_origem_id": 45,
+    "pino_origem": "4",
+    "componente_destino_id": 46,
+    "pino_destino": "3",
+    "bitola_mm2": 1.5,
+    "cor_fio": "Vermelho",
+    "caminho_geometria_json": null
+  }
+]
