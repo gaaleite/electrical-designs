@@ -1,41 +1,15 @@
+import streamlit as st
 import json
 import os
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional
+import matplotlib.pyplot as plt
 
-app = FastAPI()
+# Configuração da página do Streamlit
+st.set_page_config(page_title="Painel Elétrico - Streamlit", page_icon="⚡", layout="wide")
 
-# Configuração de CORS para permitir a comunicação com o React (.tsx)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+st.title("⚡ Visualizador Industrial Dinâmico (Streamlit)")
+st.markdown("Este app processa a lógica de roteamento e colisão direto na nuvem.")
 
-# --- MODELAGEM DOS DADOS (Pydantic) ---
-class Ponto(BaseModel):
-    x: float
-    y: float
-
-class ComponenteFisico(BaseModel):
-    id: int
-    nome: str
-    x: float
-    y: float
-
-class ConexaoFio(BaseModel):
-    projeto_id: int
-    componente_origem_id: int
-    componente_destino_id: int
-    cor_fio: str
-    caminho_geometria_json: Optional[List[Ponto]] = None
-
-
-# --- FUNÇÕES DE LEITURA DO DISCO ---
+# --- FUNÇÃO DE LEITURA DO DISCO ---
 def ler_json_do_disco(nome_arquivo: str):
     if not os.path.exists(nome_arquivo):
         return []
@@ -43,80 +17,114 @@ def ler_json_do_disco(nome_arquivo: str):
         with open(nome_arquivo, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        print(f"Erro ao ler o arquivo {nome_arquivo}: {e}")
+        st.error(f"Erro ao ler o arquivo {nome_arquivo}: {e}")
         return []
 
+# --- FLUXO PRINCIPAL DO STREAMLIT ---
 
-# --- ROTAS DA API ---
+# 1. Carrega os dados dos arquivos do seu repositório GitHub
+componentes_dados = ler_json_do_disco("componentes.json")
+fios_dados = ler_json_do_disco("leituras.json")
 
-# ROTA 1: Carrega o painel inicial lendo os dois arquivos JSON e calculando as rotas com desvio
-@app.get("/api/painel-inicial")
-def obter_painel_inicial():
-    componentes_dados = ler_json_do_disco("componentes.json")
-    fios_dados = ler_json_do_disco("leituras.json")
+# Se o arquivo componentes.json não existir no seu GitHub, criamos um mock em memória para o app não quebrar
+if not componentes_dados:
+    componentes_dados = [
+        {"id": 45, "nome": "F1 (Origem)", "x": 200, "y": 200},
+        {"id": 46, "nome": "K1 (Destino)", "x": 700, "y": 200},
+        {"id": 99, "nome": "Disjuntor (Obstáculo)", "x": 450, "y": 200}
+    ]
 
-    # Criamos um mapa de posições para busca rápida por ID
-    posicoes_componentes = {c["id"]: {"x": c["x"], "y": c["y"]} for c in componentes_dados}
+# Criamos um mapa de posições para busca rápida por ID
+posicoes_componentes = {c["id"]: {"x": c["x"], "y": c["y"], "nome": c.get("nome", f"Comp {c['id']}")} for c in componentes_dados}
+
+largura_comp = 100
+altura_comp = 140
+espacamento_fios = 12
+resultados_fios = []
+historico_rotas = {}
+
+# 2. Processa o Algoritmo de Roteamento e Colisão (Exatamente a sua lógica)
+for fio in fios_dados:
+    dados = fio.copy()
+    origem_id = dados["componente_origem_id"]
+    destino_id = dados["componente_destino_id"]
     
-    largura_comp = 100
-    altura_comp = 140
-    espacamento_fios = 12
-    resultados_fios = []
-    historico_rotas = {}
+    origem = posicoes_componentes.get(origem_id, {"x": 100, "y": 100})
+    destino = posicoes_componentes.get(destino_id, {"x": 200, "y": 200})
+    
+    par_chave = tuple(sorted([origem_id, destino_id]))
+    id_rota = historico_rotas.get(par_chave, 0)
+    historico_rotas[par_chave] = id_rota + 1
+    
+    deslocamento = id_rota * espacamento_fios
+    ponto_intermediario_x = origem["x"] + (destino["x"] - origem["x"]) / 2 + deslocamento
+    
+    colidiu = False
+    obstaculo_pos = None
+    for c_id, pos in posicoes_componentes.items():
+        if c_id == origem_id or c_id == destino_id:
+            continue
+        esquerda, direita = pos["x"] - (largura_comp / 2), pos["x"] + (largura_comp / 2)
+        topo, base = pos["y"] - (altura_comp / 2), pos["y"] + (altura_comp / 2)
+        
+        if (esquerda - 15) <= ponto_intermediario_x <= (direita + 15) and (topo - 15) <= origem["y"] <= (base + 15):
+            colidiu = True
+            obstaculo_pos = pos
+            break
 
-    for fio in fios_dados:
-        dados = fio.copy()
-        origem_id = dados["componente_origem_id"]
-        destino_id = dados["componente_destino_id"]
+    if colidiu and obstaculo_pos:
+        y_desvio = obstaculo_pos["y"] - (altura_comp / 2) - 30 - deslocamento
+        caminho = [
+            {"x": origem["x"], "y": origem["y"]},
+            {"x": origem["x"] + 30 + deslocamento, "y": origem["y"]},
+            {"x": origem["x"] + 30 + deslocamento, "y": y_desvio},
+            {"x": destino["x"] - 30 - deslocamento, "y": y_desvio},
+            {"x": destino["x"] - 30 - deslocamento, "y": destino["y"]},
+            {"x": destino["x"], "y": destino["y"]}
+        ]
+    else:
+        caminho = [
+            {"x": origem["x"], "y": origem["y"]},
+            {"x": ponto_intermediario_x, "y": origem["y"]},
+            {"x": ponto_intermediario_x, "y": destino["y"]},
+            {"x": destino["x"], "y": destino["y"]}
+        ]
         
-        origem = posicoes_componentes.get(origem_id, {"x": 100, "y": 100})
-        destino = posicoes_componentes.get(destino_id, {"x": 200, "y": 200})
-        
-        par_chave = tuple(sorted([origem_id, destino_id]))
-        id_rota = historico_rotas.get(par_chave, 0)
-        historico_rotas[par_chave] = id_rota + 1
-        
-        deslocamento = id_rota * espacamento_fios
-        ponto_intermediario_x = origem["x"] + (destino["x"] - origem["x"]) / 2 + deslocamento
-        
-        # Algoritmo de Detecção de Colisão em relação ao obstáculo (ID 99 ou qualquer outro no meio)
-        colidiu = False
-        obstaculo_pos = None
-        for c_id, pos in posicoes_componentes.items():
-            if c_id == origem_id or c_id == destino_id:
-                continue
-            esquerda, direita = pos["x"] - (largura_comp / 2), pos["x"] + (largura_comp / 2)
-            topo, base = pos["y"] - (altura_comp / 2), pos["y"] + (altura_comp / 2)
-            
-            if (esquerda - 15) <= ponto_intermediario_x <= (direita + 15) and (topo - 15) <= origem["y"] <= (base + 15):
-                colidiu = True
-                obstaculo_pos = pos
-                break
+    dados["caminho_geometria_json"] = caminho
+    resultados_fios.append(dados)
 
-        if colidiu and obstaculo_pos:
-            # Desvio ortogonal por cima do obstáculo
-            y_desvio = obstaculo_pos["y"] - (altura_comp / 2) - 30 - deslocamento
-            caminho = [
-                {"x": origem["x"], "y": origem["y"]},
-                {"x": origem["x"] + 30 + deslocamento, "y": origem["y"]},
-                {"x": origem["x"] + 30 + deslocamento, "y": y_desvio},
-                {"x": destino["x"] - 30 - deslocamento, "y": y_desvio},
-                {"x": destino["x"] - 30 - deslocamento, "y": destino["y"]},
-                {"x": destino["x"], "y": destino["y"]}
-            ]
-        else:
-            # Rota ortogonal padrão em Z
-            caminho = [
-                {"x": origem["x"], "y": origem["y"]},
-                {"x": ponto_intermediario_x, "y": origem["y"]},
-                {"x": ponto_intermediario_x, "y": destino["y"]},
-                {"x": destino["x"], "y": destino["y"]}
-            ]
-            
-        dados["caminho_geometria_json"] = caminho
-        resultados_fios.append(dados)
+# 3. INTERFACE VISUAL DO STREAMLIT (Divide a tela em duas colunas)
+col1, col2 = st.columns(2)
 
-    return {
-        "componentes": componentes_dados,
-        "fios": resultados_fios
-    }
+with col1:
+    st.subheader("📊 Gráfico do Painel Elétrico")
+    fig, ax = plt.subplots(figsize=(10, 6), facecolor='#111111')
+    ax.set_facecolor('#111111')
+
+    # Desenha os componentes na tela
+    for c_id, comp in posicoes_componentes.items():
+        cor_borda = '#ff4d4d' if c_id == 99 else '#007acc'
+        retangulo = plt.Rectangle((comp["x"] - (largura_comp/2), comp["y"] - (altura_comp/2)), 
+                                  largura_comp, altura_comp, fill=True, color='#222222', 
+                                  edgecolor=cor_borda, linewidth=2, zorder=3)
+        ax.add_patch(retangulo)
+        ax.text(comp["x"], comp["y"], f"{comp['nome']}\nID: {c_id}", color='white', 
+                ha='center', va='center', fontweight='bold', fontsize=9)
+
+    # Desenha os fios processados
+    for fio in resultados_fios:
+        pontos = fio["caminho_geometria_json"]
+        xs = [p["x"] for p in pontos]
+        ys = [p["y"] for p in pontos]
+        
+        cor_render = "red" if "vermelho" in str(fio.get("cor_fio", "")).lower() else "white"
+        ax.plot(xs, ys, color=cor_render, linewidth=2.5, zorder=2)
+
+    ax.set_xlim(50, 850)
+    ax.set_ylim(0, 450)
+    ax.axis('off')
+    st.pyplot(fig) # Renderiza o gráfico do painel na tela
+
+with col2:
+    st.subheader("📋 JSON Final Calculado")
+    st.json(resultados_fios) # Exibe o resultado do seu JSON com as coordenadas preenchidas
