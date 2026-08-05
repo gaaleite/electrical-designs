@@ -109,7 +109,7 @@ elif metodo == "Inteligência Artificial (Prompt)":
                     }
 
                     response = client_local.models.generate_content(
-                        model='gemini-2.0-flash',
+                        model='gemini-1.5-flash',
                         contents=prompt_usuario,
                         config=types.GenerateContentConfig(
                             system_instruction="Gere componentes industriais e conexões elétricas lógicas entre eles espalhados em X (100-800) e Y (100-400).",
