@@ -60,19 +60,95 @@ if metodo == "Planilha Escrita (Manual)":
 elif metodo == "Inteligência Artificial (Prompt)":
     st.subheader("🤖 Assistente de IA para Roteamento")
     prompt_usuario = st.text_area(
-        "Descreva as conexões elétricas que você deseja criar:",
-        placeholder="Ex: Conecte o componente 45 (pino 2) ao componente 46 (pino 1) usando um fio preto de 2.5mm."
+        "Descreva as conexões elétricas e componentes do painel que você deseja criar:",
+        value="crie um diagrama elétrico de 380v trifásico, tendo uma seccionadora ligada a um barramento do tipo espinha de peixe, nele terá 16 disjuntores trifásicos e preciso que sobre 5 barras para se caso tiver de adicionar outros disjuntores, e também quero um bloco de dps",
+        height=150
     )
     
     if st.button("Gerar Diagrama por IA"):
-        st.warning("⚠️ Integração com API de IA pendente. (Aqui conectaremos a chave do Gemini/OpenAI para converter o texto em dados estruturados).")
-        # Mock simulando o retorno da IA após processar o texto
-        fios_dados = [
-            {"componente_origem_id": 45, "pino_origem": "2", "componente_destino_id": 46, "pino_destino": "1", "bitola_mm2": 2.5, "cor_fio": "Preto"}
-        ]
-    else:
-        # Mantém vazio até clicar
-        fios_dados = []
+        # Força o recarregamento da chave caso o escopo global tenha falhado
+        api_key_local = st.secrets.get("GEMINI_API_KEY")
+        if "GEMINI_API_KEY" in st.secrets:
+            api_key_local = st.secrets["GEMINI_API_KEY"]
+            
+        if not api_key_local:
+            st.error("❌ Erro: Chave 'GEMINI_API_KEY' não foi encontrada ou está vazia nos Secrets do Streamlit Cloud. Verifique suas configurações.")
+        else:
+            with st.spinner("A IA está interpretando seu texto e gerando o arranjo de componentes..."):
+                try:
+                    # Garante a inicialização local do cliente se necessário
+                    from google import genai
+                    from google.genai import types
+                    import json
+                    
+                    # Limpa aspas ou espaços extras da chave
+                    api_key_local = api_key_local.strip().replace('"', '').replace("'", "")
+                    client_local = genai.Client(api_key=api_key_local)
+                    
+                    esquema_ia = {
+                        "type": "OBJECT",
+                        "properties": {
+                            "componentes": {
+                                "type": "ARRAY",
+                                "items": {
+                                    "type": "OBJECT",
+                                    "properties": {
+                                        "id": {"type": "INTEGER"},
+                                        "nome": {"type": "STRING"},
+                                        "x": {"type": "INTEGER"},
+                                        "y": {"type": "INTEGER"}
+                                    },
+                                    "required": ["id", "nome", "x", "y"]
+                                }
+                            },
+                            "fios": {
+                                "type": "ARRAY",
+                                "items": {
+                                    "type": "OBJECT",
+                                    "properties": {
+                                        "componente_origem_id": {"type": "INTEGER"},
+                                        "pino_origem": {"type": "STRING"},
+                                        "componente_destino_id": {"type": "INTEGER"},
+                                        "pino_destino": {"type": "STRING"},
+                                        "bitola_mm2": {"type": "NUMBER"},
+                                        "cor_fio": {"type": "STRING"}
+                                    },
+                                    "required": ["componente_origem_id", "componente_destino_id", "cor_fio"]
+                                }
+                            }
+                        },
+                        "required": ["componentes", "fios"]
+                    }
+
+                    instrucoes = (
+                        "Você é um engenheiro eletricista sênior. O usuário descreverá um painel industrial. "
+                        "Gere uma lista com TODOS os componentes mencionados (Geral/Seccionadora, Barramentos, DPS, e todos os 16 disjuntores requisitados). "
+                        "Distribua-os de forma organizada em uma grade visual de coordenadas X (de 100 a 800) e Y (de 100 a 400). "
+                        "Dê IDs únicos e sequenciais para cada disjuntor (ex: 1, 2, 3...)."
+                        "Gere também a lista de conexões (fios) lógicas iniciais necessárias para interligá-los baseado na sua descrição."
+                    )
+
+                    response = client_local.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt_usuario,
+                        config=types.GenerateContentConfig(
+                            system_instruction=instrucoes,
+                            response_mime_type="application/json",
+                            response_schema=esquema_ia,
+                            temperature=0.2
+                        ),
+                    )
+                    
+                    resultado = json.loads(response.text)
+                    st.session_state["dados_ia"] = resultado
+                    st.success("🤖 Projeto estruturado pela IA com sucesso!")
+                except Exception as e:
+                    st.error(f"Erro ao processar dados com o Gemini: {e}")
+                    
+    if "dados_ia" in st.session_state:
+        componentes_dados = st.session_state["dados_ia"]["componentes"]
+        fios_dados = st.session_state["dados_ia"]["fios"]
+
 
 elif metodo == "Carregar do Banco de Dados":
     st.subheader("🗄️ Projetos Salvos no Banco de Dados")
