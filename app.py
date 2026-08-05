@@ -2,20 +2,8 @@ import streamlit as st
 import os
 import matplotlib.pyplot as plt
 import json
-import streamlit as st
 
-# Exemplo se você estiver carregando de um arquivo enviado pelo usuário
-uploaded_file = st.file_uploader("Carregue o JSON corrigido", type=["json"])
-
-if uploaded_file is not None:
-    try:
-        dados = json.load(uploaded_file)
-        st.success("JSON lido com sucesso!")
-        st.write(dados)
-    except json.JSONDecodeError as e:
-        st.error(f"Erro de sintaxe no JSON: {e}")
-
-# Configuração da página do Streamlit
+# 1. Configuração da página OBRIGATORIAMENTE no topo do arquivo
 st.set_page_config(page_title="Painel Elétrico - Streamlit", page_icon="⚡", layout="wide")
 
 st.title("⚡ Visualizador Industrial Dinâmico (Streamlit)")
@@ -32,13 +20,10 @@ def ler_json_do_disco(nome_arquivo: str):
         st.error(f"Erro ao ler o arquivo {nome_arquivo}: {e}")
         return []
 
-# --- FLUXO PRINCIPAL DO STREAMLIT ---
+# --- CARREGAMENTO DE DADOS ---
 
-# 1. Carrega os dados dos arquivos do seu repositório GitHub
+# Carrega componentes padrão do repositório
 componentes_dados = ler_json_do_disco("componentes.json")
-fios_dados = ler_json_do_disco("leituras.json")
-
-# Se o arquivo componentes.json não existir no seu GitHub, criamos um mock em memória para o app não quebrar
 if not componentes_dados:
     componentes_dados = [
         {"id": 45, "nome": "F1 (Origem)", "x": 200, "y": 200},
@@ -46,7 +31,37 @@ if not componentes_dados:
         {"id": 99, "nome": "Disjuntor (Obstáculo)", "x": 450, "y": 200}
     ]
 
-# Criamos um mapa de posições para busca rápida por ID
+# Upload do arquivo JSON de fios pelo usuário
+uploaded_file = st.file_uploader("Carregue o arquivo de leituras (.json)", type=["json"])
+
+fios_dados = []
+
+# Se o usuário subir um arquivo, usamos ele. Caso contrário, tenta ler do disco.
+if uploaded_file is not None:
+    try:
+        fios_dados = json.load(uploaded_file)
+        st.success("JSON de fios carregado via upload com sucesso!")
+    except json.JSONDecodeError as e:
+        st.error(f"Erro de sintaxe no JSON enviado: {e}")
+else:
+    fios_dados = ler_json_do_disco("leituras.json")
+
+# Se não houver arquivo no upload nem no disco, criamos um mock padrão para não quebrar a tela
+if not fios_dados:
+    st.info("Nenhum arquivo enviado. Exibindo dados de simulação padrão.")
+    fios_dados = [
+        {
+            "projeto_id": 101, "componente_origem_id": 45, "pino_origem": "2",
+            "componente_destino_id": 46, "pino_destino": "1", "bitola_mm2": 2.5, "cor_fio": "Preto"
+        },
+        {
+            "projeto_id": 101, "componente_origem_id": 45, "pino_origem": "4",
+            "componente_destino_id": 46, "pino_destino": "3", "bitola_mm2": 1.5, "cor_fio": "Vermelho"
+        }
+    ]
+
+# --- ALGORITMO DE ROTEAMENTO ---
+
 posicoes_componentes = {c["id"]: {"x": c["x"], "y": c["y"], "nome": c.get("nome", f"Comp {c['id']}")} for c in componentes_dados}
 
 largura_comp = 100
@@ -55,7 +70,6 @@ espacamento_fios = 12
 resultados_fios = []
 historico_rotas = {}
 
-# 2. Processa o Algoritmo de Roteamento e Colisão (Exatamente a sua lógica)
 for fio in fios_dados:
     dados = fio.copy()
     origem_id = dados["componente_origem_id"]
@@ -105,7 +119,7 @@ for fio in fios_dados:
     dados["caminho_geometria_json"] = caminho
     resultados_fios.append(dados)
 
-# 3. INTERFACE VISUAL DO STREAMLIT (Divide a tela em duas colunas)
+# --- INTERFACE VISUAL ---
 col1, col2 = st.columns(2)
 
 with col1:
@@ -129,14 +143,21 @@ with col1:
         xs = [p["x"] for p in pontos]
         ys = [p["y"] for p in pontos]
         
-        cor_render = "red" if "vermelho" in str(fio.get("cor_fio", "")).lower() else "white"
+        cor_fio_str = str(fio.get("cor_fio", "")).lower()
+        if "vermelho" in cor_fio_str:
+            cor_render = "red"
+        elif "preto" in cor_fio_str:
+            cor_render = "#444444"  # Um cinza escuro visível no fundo preto do Matplotlib
+        else:
+            cor_render = "white"
+            
         ax.plot(xs, ys, color=cor_render, linewidth=2.5, zorder=2)
 
     ax.set_xlim(50, 850)
     ax.set_ylim(0, 450)
     ax.axis('off')
-    st.pyplot(fig) # Renderiza o gráfico do painel na tela
+    st.pyplot(fig)
 
 with col2:
     st.subheader("📋 JSON Final Calculado")
-    st.json(resultados_fios) # Exibe o resultado do seu JSON com as coordenadas preenchidas
+    st.json(resultados_fios)
