@@ -45,7 +45,7 @@ metodo = st.sidebar.radio(
     ["Planilha Escrita (Manual)", "Inteligência Artificial (Prompt)", "Carregar do Banco de Dados"]
 )
 
-# Definição dos valores padrão para o caso do algoritmo não rodar as opções abaixo
+# Definição dos valores padrão
 componentes_dados = [
     {"id": 45, "nome": "F1 (Origem)", "x": 200, "y": 200},
     {"id": 46, "nome": "K1 (Destino)", "x": 700, "y": 200},
