@@ -4,6 +4,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import json
 
+# Inicializar cliente do Gemini caso a chave exista
+api_key = st.secrets.get("GEMINI_API_KEY")
+client = None
+if api_key:
+    client = genai.Client(api_key=api_key)
+
+
 # 1. Configuração da página
 st.set_page_config(page_title="Gerador de Projetos Elétricos", page_icon="⚡", layout="wide")
 
