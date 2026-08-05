@@ -157,7 +157,4 @@ with col1:
     ax.set_ylim(0, 450)
     ax.axis('off')
     st.pyplot(fig)
-
-with col2:
-    st.subheader("📋 JSON Final Calculado")
-    st.json(resultados_fios)
+    
