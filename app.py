@@ -60,14 +60,18 @@ if metodo == "Planilha Escrita (Manual)":
 
 elif metodo == "Inteligência Artificial (Prompt)":
     st.subheader("🤖 Assistente de IA para Roteamento")
-    prompt_usuario = st.text_area("Descreva o painel:", value="crie um diagrama elétrico com seccionadora e 16 disjuntores", height=100)
+    prompt_usuario = st.text_area(
+        "Descreva as conexões elétricas e componentes do painel que você deseja criar:",
+        value="crie um diagrama elétrico de 380v trifásico com barramento do tipo espinha de peixe, com seccionadora como geral, e 16 disjuntores trifásicos, além de, ter 5 barramentos sobrando para se caso for acrescentar novos disjuntores, e que tenha um bloco de dps",
+        height=150
+    )
     
     if st.button("Gerar Diagrama por IA"):
         api_key_local = st.secrets.get("GEMINI_API_KEY")
         if not api_key_local:
             st.error("❌ Erro: Chave 'GEMINI_API_KEY' não configurada.")
         else:
-            with st.spinner("Processando..."):
+            with st.spinner("Processando descrição com o Gemini 2.0..."):
                 try:
                     api_key_local = api_key_local.strip().replace('"', '').replace("'", "")
                     client_local = genai.Client(api_key=api_key_local)
@@ -105,16 +109,13 @@ elif metodo == "Inteligência Artificial (Prompt)":
                     }
 
                     response = client_local.models.generate_content(
-    model='gemini-2.0-flash',  # <--- Modelo atualizado e ativo
-    contents=prompt_usuario,
-    config=types.GenerateContentConfig(
-        system_instruction="Gere componentes industriais e conexões elétricas lógicas entre eles espalhados em X (100-800) e Y (100-400).",
-        response_mime_type="application/json",
-        response_schema=esquema_ia,
-        temperature=0.2
-    ),
-)
-
+                        model='gemini-2.0-flash',
+                        contents=prompt_usuario,
+                        config=types.GenerateContentConfig(
+                            system_instruction="Gere componentes industriais e conexões elétricas lógicas entre eles espalhados em X (100-800) e Y (100-400).",
+                            response_mime_type="application/json",
+                            response_schema=esquema_ia,
+                            temperature=0.2
                         ),
                     )
                     st.session_state["dados_ia"] = json.loads(response.text)
@@ -131,7 +132,7 @@ elif metodo == "Carregar do Banco de Dados":
     banco = carregar_banco_projetos()
     projeto_selecionado = st.selectbox("Selecione:", list(banco.keys()))
     componentes_dados = banco[projeto_selecionado]["componentes"]
-    fios_dados = banco[projeto_selecionado]["fios"]
+    fios_dados = banco[projeto_selecion==]
 
 # --- PROCESSAMENTO DO ALGORITMO DE LOGÍSTICA/ROTEAMENTO ---
 posicoes_componentes = {c["id"]: {"x": c["x"], "y": c["y"], "nome": c.get("nome", f"Comp {c['id']}")} for c in componentes_dados}
@@ -177,7 +178,7 @@ for fio in fios_dados:
         y_desvio = obstaculo_pos["y"] - (altura_comp / 2) - 20 - deslocamento
         dados["caminho_geometria_json"] = [
             {"x": origem["x"], "y": origem["y"]},
-            {"x": origem["x"] + 20 + deslocamento, "y": origem["y"]},
+            {"x": origem["x"] + 20 + deslocamento, "y": broom["y"] if "broom" in locals() else origem["y"]},
             {"x": origem["x"] + 20 + deslocamento, "y": y_desvio},
             {"x": destino["x"] - 20 - deslocamento, "y": y_desvio},
             {"x": destino["x"] - 20 - deslocamento, "y": destino["y"]},
