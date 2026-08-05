@@ -26,15 +26,6 @@ def carregar_banco_projetos():
                 {"componente_origem_id": 45, "pino_origem": "2", "componente_destino_id": 46, "pino_destino": "1", "bitola_mm2": 2.5, "cor_fio": "Preto"},
                 {"componente_origem_id": 45, "pino_origem": "4", "componente_destino_id": 46, "pino_destino": "3", "bitola_mm2": 1.5, "cor_fio": "Vermelho"}
             ]
-        },
-        "Projeto de Automação Esteira (ID 102)": {
-            "componentes": [
-                {"id": 45, "nome": "Seccionadora", "x": 150, "y": 250},
-                {"id": 46, "nome": "DPS Geral", "x": 650, "y": 250}
-            ],
-            "fios": [
-                {"componente_origem_id": 45, "pino_origem": "1", "componente_destino_id": 46, "pino_destino": "1", "bitola_mm2": 4.0, "cor_fio": "Azul"}
-            ]
         }
     }
 
@@ -61,7 +52,6 @@ if "dados_ia" not in st.session_state:
 
 if metodo == "Planilha Escrita (Manual)":
     st.subheader("📝 Inserção de Dados via Planilha")
-    st.markdown("Configure os fios dinamicamente abaixo:")
     df_inicial = pd.DataFrame([
         {"componente_origem_id": 45, "pino_origem": "2", "componente_destino_id": 46, "pino_destino": "1", "bitola_mm2": 2.5, "cor_fio": "Preto"}
     ])
@@ -70,18 +60,14 @@ if metodo == "Planilha Escrita (Manual)":
 
 elif metodo == "Inteligência Artificial (Prompt)":
     st.subheader("🤖 Assistente de IA para Roteamento")
-    prompt_usuario = st.text_area(
-        "Descreva as conexões elétricas e componentes do painel que você deseja criar:",
-        value="crie um diagrama elétrico de 380v trifásico, tendo uma seccionadora ligada a um barramento do tipo espinha de peixe, nele terá 16 disjuntores trifásicos e preciso que sobre 5 barras para se caso tiver de adicionar outros disjuntores, e também quero um bloco de dps",
-        height=150
-    )
+    prompt_usuario = st.text_area("Descreva o painel:", value="crie um diagrama elétrico com seccionadora e 16 disjuntores", height=100)
     
     if st.button("Gerar Diagrama por IA"):
         api_key_local = st.secrets.get("GEMINI_API_KEY")
         if not api_key_local:
-            st.error("❌ Erro: Chave 'GEMINI_API_KEY' não configurada nos Secrets do Streamlit Cloud.")
+            st.error("❌ Erro: Chave 'GEMINI_API_KEY' não configurada.")
         else:
-            with st.spinner("A IA está processando sua descrição e distribuindo os componentes..."):
+            with st.spinner("Processando..."):
                 try:
                     api_key_local = api_key_local.strip().replace('"', '').replace("'", "")
                     client_local = genai.Client(api_key=api_key_local)
@@ -108,10 +94,7 @@ elif metodo == "Inteligência Artificial (Prompt)":
                                     "type": "OBJECT",
                                     "properties": {
                                         "componente_origem_id": {"type": "INTEGER"},
-                                        "pino_origem": {"type": "STRING"},
                                         "componente_destino_id": {"type": "INTEGER"},
-                                        "pino_destino": {"type": "STRING"},
-                                        "bitola_mm2": {"type": "NUMBER"},
                                         "cor_fio": {"type": "STRING"}
                                     },
                                     "required": ["componente_origem_id", "componente_destino_id", "cor_fio"]
@@ -121,40 +104,31 @@ elif metodo == "Inteligência Artificial (Prompt)":
                         "required": ["componentes", "fios"]
                     }
 
-                    instrucoes = (
-                        "Você é um engenheiro eletricista sênior. O usuário descreverá um painel industrial. "
-                        "Gere uma lista com TODOS os componentes mencionados (Geral, Barramentos, DPS, e todos os 16 disjuntores). "
-                        "Distribua todos eles organizadamente em uma matriz horizontal e vertical de coordenadas X (de 100 a 800) e Y (de 100 a 400). "
-                        "Gere também fios de ligações lógicas iniciais entre eles para alimentar o circuito."
-                    )
-
                     response = client_local.models.generate_content(
                         model='gemini-2.5-flash',
                         contents=prompt_usuario,
                         config=types.GenerateContentConfig(
-                            system_instruction=instrucoes,
+                            system_instruction="Gere componentes industriais e conexões elétricas lógicas entre eles espalhados em X (100-800) e Y (100-400).",
                             response_mime_type="application/json",
                             response_schema=esquema_ia,
                             temperature=0.2
                         ),
                     )
-                    
                     st.session_state["dados_ia"] = json.loads(response.text)
-                    st.success("🤖 Projeto modelado pela IA com sucesso!")
+                    st.success("🤖 Projeto modelado com sucesso!")
                 except Exception as e:
-                    st.error(f"Erro ao processar dados com o Gemini: {e}")
+                    st.error(f"Erro na IA: {e}")
                     
     if st.session_state["dados_ia"]:
         componentes_dados = st.session_state["dados_ia"]["componentes"]
         fios_dados = st.session_state["dados_ia"]["fios"]
 
 elif metodo == "Carregar do Banco de Dados":
-    st.subheader("🗄️ Projetos Salvos no Banco de Dados")
+    st.subheader("🗄️ Projetos Salvos")
     banco = carregar_banco_projetos()
-    projeto_selecionado = st.selectbox("Selecione o projeto para carregar:", list(banco.keys()))
+    projeto_selecionado = st.selectbox("Selecione:", list(banco.keys()))
     componentes_dados = banco[projeto_selecionado]["componentes"]
     fios_dados = banco[projeto_selecionado]["fios"]
-    st.success(f"Projeto '{projeto_selecionado}' carregado com sucesso!")
 
 # --- PROCESSAMENTO DO ALGORITMO DE LOGÍSTICA/ROTEAMENTO ---
 posicoes_componentes = {c["id"]: {"x": c["x"], "y": c["y"], "nome": c.get("nome", f"Comp {c['id']}")} for c in componentes_dados}
@@ -198,7 +172,7 @@ for fio in fios_dados:
 
     if colidiu and obstaculo_pos:
         y_desvio = obstaculo_pos["y"] - (altura_comp / 2) - 20 - deslocamento
-        caminho = [
+        dados["caminho_geometria_json"] = [
             {"x": origem["x"], "y": origem["y"]},
             {"x": origem["x"] + 20 + deslocamento, "y": origem["y"]},
             {"x": origem["x"] + 20 + deslocamento, "y": y_desvio},
@@ -207,6 +181,35 @@ for fio in fios_dados:
             {"x": destino["x"], "y": destino["y"]}
         ]
     else:
-        caminho = [
+        dados["caminho_geometria_json"] = [
             {"x": origem["x"], "y": origem["y"]},
             {"x": ponto_intermediario_x, "y": origem["y"]},
+            {"x": ponto_intermediario_x, "y": destino["y"]},
+            {"x": destino["x"], "y": destino["y"]}
+        ]
+        
+    resultados_fios.append(dados)
+
+# --- MAPA VISUAL DO PAINEL ELÉTRICO ---
+if componentes_dados:
+    st.subheader("📊 Gráfico Dinâmico Gerado Real-Time")
+    fig, ax = plt.subplots(figsize=(14, 6), facecolor='#111111')
+    ax.set_facecolor('#111111')
+
+    for c_id, comp in posicoes_componentes.items():
+        retangulo = plt.Rectangle((comp["x"] - (largura_comp/2), comp["y"] - (altura_comp/2)), largura_comp, altura_comp, fill=True, color='#222222', edgecolor='#007acc', linewidth=1.5, zorder=3)
+        ax.add_patch(retangulo)
+        ax.text(comp["x"], comp["y"], f"{comp['nome']}\nID: {c_id}", color='white', ha='center', va='center', fontweight='bold', fontsize=7)
+
+    for fio in resultados_fios:
+        pontos = fio["caminho_geometria_json"]
+        xs = [p["x"] for p in pontos]
+        ys = [p["y"] for p in pontos]
+        cor_fio_str = str(fio.get("cor_fio", "")).lower()
+        cor_render = "red" if "vermelho" in cor_fio_str else ("#666666" if "preto" in cor_fio_str else ("#1e90ff" if "azul" in cor_fio_str else "white"))
+        ax.plot(xs, ys, color=cor_render, linewidth=1.5, zorder=2)
+
+    ax.set_xlim(50, 850)
+    ax.set_ylim(0, 500)
+    ax.axis('off')
+    st.pyplot(fig)
