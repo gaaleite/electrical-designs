@@ -105,13 +105,16 @@ elif metodo == "Inteligência Artificial (Prompt)":
                     }
 
                     response = client_local.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt_usuario,
-                        config=types.GenerateContentConfig(
-                            system_instruction="Gere componentes industriais e conexões elétricas lógicas entre eles espalhados em X (100-800) e Y (100-400).",
-                            response_mime_type="application/json",
-                            response_schema=esquema_ia,
-                            temperature=0.2
+    model='gemini-2.0-flash',  # <--- Modelo atualizado e ativo
+    contents=prompt_usuario,
+    config=types.GenerateContentConfig(
+        system_instruction="Gere componentes industriais e conexões elétricas lógicas entre eles espalhados em X (100-800) e Y (100-400).",
+        response_mime_type="application/json",
+        response_schema=esquema_ia,
+        temperature=0.2
+    ),
+)
+
                         ),
                     )
                     st.session_state["dados_ia"] = json.loads(response.text)
