@@ -3,15 +3,8 @@ import os
 import matplotlib.pyplot as plt
 import pandas as pd
 import json
-# ADICIONE ESTAS DUAS LINHAS ABAIXO NO SEU ARQUIVO:
 from google import genai
 from google.genai import types
-
-# Inicializar cliente do Gemini caso a chave exista
-api_key = st.secrets.get("GEMINI_API_KEY")
-client = None
-if api_key:
-    client = genai.Client(api_key=api_key)
 
 # 1. Configuração da página
 st.set_page_config(page_title="Gerador de Projetos Elétricos", page_icon="⚡", layout="wide")
@@ -23,37 +16,55 @@ st.markdown("Crie, edite e simule diagramas elétricos usando planilhas dinâmic
 @st.cache_data
 def carregar_banco_projetos():
     return {
-        "Projeto Padrão de Fábrica (ID 101)": [
-            {"componente_origem_id": 45, "pino_origem": "2", "componente_destino_id": 46, "pino_destino": "1", "bitola_mm2": 2.5, "cor_fio": "Preto"},
-            {"componente_origem_id": 45, "pino_origem": "4", "componente_destino_id": 46, "pino_destino": "3", "bitola_mm2": 1.5, "cor_fio": "Vermelho"}
-        ],
-        "Projeto de Automação Esteira (ID 102)": [
-            {"componente_origem_id": 45, "pino_origem": "1", "componente_destino_id": 99, "pino_destino": "1", "bitola_mm2": 4.0, "cor_fio": "Preto"}
-        ]
+        "Projeto Padrão de Fábrica (ID 101)": {
+            "componentes": [
+                {"id": 45, "nome": "F1 (Origem)", "x": 200, "y": 200},
+                {"id": 46, "nome": "K1 (Destino)", "x": 700, "y": 200},
+                {"id": 99, "nome": "Disjuntor (Obstáculo)", "x": 450, "y": 200}
+            ],
+            "fios": [
+                {"componente_origem_id": 45, "pino_origem": "2", "componente_destino_id": 46, "pino_destino": "1", "bitola_mm2": 2.5, "cor_fio": "Preto"},
+                {"componente_origem_id": 45, "pino_origem": "4", "componente_destino_id": 46, "pino_destino": "3", "bitola_mm2": 1.5, "cor_fio": "Vermelho"}
+            ]
+        },
+        "Projeto de Automação Esteira (ID 102)": {
+            "componentes": [
+                {"id": 45, "nome": "Seccionadora", "x": 150, "y": 250},
+                {"id": 46, "nome": "DPS Geral", "x": 650, "y": 250}
+            ],
+            "fios": [
+                {"componente_origem_id": 45, "pino_origem": "1", "componente_destino_id": 46, "pino_destino": "1", "bitola_mm2": 4.0, "cor_fio": "Azul"}
+            ]
+        }
     }
 
-# --- MENU LATERAL DE CONTROLE (MÉTODOS DE CRIAÇÃO) ---
+# --- MENU LATERAL DE CONTROLE ---
 st.sidebar.header("🛠️ Método de Criação")
 metodo = st.sidebar.radio(
     "Escolha como deseja criar o projeto:",
     ["Planilha Escrita (Manual)", "Inteligência Artificial (Prompt)", "Carregar do Banco de Dados"]
 )
 
-# Inicialização dos dados dos fios
+# Definição dos valores padrão para o caso do algoritmo não rodar as opções abaixo
+componentes_dados = [
+    {"id": 45, "nome": "F1 (Origem)", "x": 200, "y": 200},
+    {"id": 46, "nome": "K1 (Destino)", "x": 700, "y": 200},
+    {"id": 99, "nome": "Disjuntor (Obstáculo)", "x": 450, "y": 200}
+]
 fios_dados = []
 
-# --- LÓGICA DE ENTRADA DE DADOS CONFIGURADA POR MÉTODOS ---
+# --- VARIÁVEIS DE SESSÃO DA IA ---
+if "dados_ia" not in st.session_state:
+    st.session_state["dados_ia"] = None
+
+# --- PROCESSAMENTO DOS MÉTODOS DE ENTRADA ---
 
 if metodo == "Planilha Escrita (Manual)":
     st.subheader("📝 Inserção de Dados via Planilha")
-    st.markdown("Adicione linhas, digite os IDs dos componentes e configure as conexões diretamente na tabela abaixo:")
-    
-    # Criamos um DataFrame padrão vazio ou inicial para o usuário preencher
+    st.markdown("Configure os fios dinamicamente abaixo:")
     df_inicial = pd.DataFrame([
         {"componente_origem_id": 45, "pino_origem": "2", "componente_destino_id": 46, "pino_destino": "1", "bitola_mm2": 2.5, "cor_fio": "Preto"}
     ])
-    
-    # O st.data_editor permite que o usuário edite a planilha online, adicione (+) e delete linhas
     df_editado = st.data_editor(df_inicial, num_rows="dynamic", use_container_width=True)
     fios_dados = df_editado.to_dict(orient="records")
 
@@ -66,22 +77,12 @@ elif metodo == "Inteligência Artificial (Prompt)":
     )
     
     if st.button("Gerar Diagrama por IA"):
-        # Força o recarregamento da chave caso o escopo global tenha falhado
         api_key_local = st.secrets.get("GEMINI_API_KEY")
-        if "GEMINI_API_KEY" in st.secrets:
-            api_key_local = st.secrets["GEMINI_API_KEY"]
-            
         if not api_key_local:
-            st.error("❌ Erro: Chave 'GEMINI_API_KEY' não foi encontrada ou está vazia nos Secrets do Streamlit Cloud. Verifique suas configurações.")
+            st.error("❌ Erro: Chave 'GEMINI_API_KEY' não configurada nos Secrets do Streamlit Cloud.")
         else:
-            with st.spinner("A IA está interpretando seu texto e gerando o arranjo de componentes..."):
+            with st.spinner("A IA está processando sua descrição e distribuindo os componentes..."):
                 try:
-                    # Garante a inicialização local do cliente se necessário
-                    from google import genai
-                    from google.genai import types
-                    import json
-                    
-                    # Limpa aspas ou espaços extras da chave
                     api_key_local = api_key_local.strip().replace('"', '').replace("'", "")
                     client_local = genai.Client(api_key=api_key_local)
                     
@@ -122,10 +123,9 @@ elif metodo == "Inteligência Artificial (Prompt)":
 
                     instrucoes = (
                         "Você é um engenheiro eletricista sênior. O usuário descreverá um painel industrial. "
-                        "Gere uma lista com TODOS os componentes mencionados (Geral/Seccionadora, Barramentos, DPS, e todos os 16 disjuntores requisitados). "
-                        "Distribua-os de forma organizada em uma grade visual de coordenadas X (de 100 a 800) e Y (de 100 a 400). "
-                        "Dê IDs únicos e sequenciais para cada disjuntor (ex: 1, 2, 3...)."
-                        "Gere também a lista de conexões (fios) lógicas iniciais necessárias para interligá-los baseado na sua descrição."
+                        "Gere uma lista com TODOS os componentes mencionados (Geral, Barramentos, DPS, e todos os 16 disjuntores). "
+                        "Distribua todos eles organizadamente em uma matriz horizontal e vertical de coordenadas X (de 100 a 800) e Y (de 100 a 400). "
+                        "Gere também fios de ligações lógicas iniciais entre eles para alimentar o circuito."
                     )
 
                     response = client_local.models.generate_content(
@@ -139,131 +139,74 @@ elif metodo == "Inteligência Artificial (Prompt)":
                         ),
                     )
                     
-                    resultado = json.loads(response.text)
-                    st.session_state["dados_ia"] = resultado
-                    st.success("🤖 Projeto estruturado pela IA com sucesso!")
+                    st.session_state["dados_ia"] = json.loads(response.text)
+                    st.success("🤖 Projeto modelado pela IA com sucesso!")
                 except Exception as e:
                     st.error(f"Erro ao processar dados com o Gemini: {e}")
                     
-    if "dados_ia" in st.session_state:
+    if st.session_state["dados_ia"]:
         componentes_dados = st.session_state["dados_ia"]["componentes"]
         fios_dados = st.session_state["dados_ia"]["fios"]
-
 
 elif metodo == "Carregar do Banco de Dados":
     st.subheader("🗄️ Projetos Salvos no Banco de Dados")
     banco = carregar_banco_projetos()
     projeto_selecionado = st.selectbox("Selecione o projeto para carregar:", list(banco.keys()))
-    fios_dados = banco[projeto_selecionado]
+    componentes_dados = banco[projeto_selecionado]["componentes"]
+    fios_dados = banco[projeto_selecionado]["fios"]
     st.success(f"Projeto '{projeto_selecionado}' carregado com sucesso!")
 
-
-# --- POSICIONAMENTO FIXO DOS COMPONENTES ---
-componentes_dados = [
-    {"id": 45, "nome": "F1 (Origem)", "x": 200, "y": 200},
-    {"id": 46, "nome": "K1 (Destino)", "x": 700, "y": 200},
-    {"id": 99, "nome": "Disjuntor (Obstáculo)", "x": 450, "y": 200}
-]
+# --- PROCESSAMENTO DO ALGORITMO DE LOGÍSTICA/ROTEAMENTO ---
 posicoes_componentes = {c["id"]: {"x": c["x"], "y": c["y"], "nome": c.get("nome", f"Comp {c['id']}")} for c in componentes_dados}
 
-largura_comp = 100
-altura_comp = 140
-espacamento_fios = 12
+largura_comp = 80
+altura_comp = 100
+espacamento_fios = 10
 resultados_fios = []
 historico_rotas = {}
 
-# --- ALGORITMO DE ROTEAMENTO (Executa os dados gerados acima) ---
-if fios_dados:
-    for fio in fios_dados:
-        # Validação simples para evitar quebras se o usuário deixar campos em branco na planilha
-        try:
-            origem_id = int(fio["componente_origem_id"])
-            destino_id = int(fio["componente_destino_id"])
-        except (ValueError, TypeError, KeyError):
-            continue # Pula linhas inválidas ou incompletas
-            
-        dados = fio.copy()
-        origem = posicoes_componentes.get(origem_id, {"x": 100, "y": 100})
-        destino = posicoes_componentes.get(destino_id, {"x": 200, "y": 200})
+for fio in fios_dados:
+    try:
+        origem_id = int(fio["componente_origem_id"])
+        destino_id = int(fio["componente_destino_id"])
+    except (ValueError, TypeError, KeyError):
+        continue
         
-        par_chave = tuple(sorted([origem_id, destino_id]))
-        id_rota = historico_rotas.get(par_chave, 0)
-        historico_rotas[par_chave] = id_rota + 1
+    dados = fio.copy()
+    origem = posicoes_componentes.get(origem_id, {"x": 100, "y": 100})
+    destino = posicoes_componentes.get(destino_id, {"x": 200, "y": 200})
+    
+    par_chave = tuple(sorted([origem_id, destino_id]))
+    id_rota = historico_rotas.get(par_chave, 0)
+    historico_rotas[par_chave] = id_rota + 1
+    
+    deslocamento = id_rota * espacamento_fios
+    ponto_intermediario_x = origem["x"] + (destino["x"] - origem["x"]) / 2 + deslocamento
+    
+    colidiu = False
+    obstaculo_pos = None
+    for c_id, pos in posicoes_componentes.items():
+        if c_id == origem_id or c_id == destino_id:
+            continue
+        esquerda, direita = pos["x"] - (largura_comp / 2), pos["x"] + (largura_comp / 2)
+        topo, base = pos["y"] - (altura_comp / 2), pos["y"] + (altura_comp / 2)
         
-        deslocamento = id_rota * espacamento_fios
-        ponto_intermediario_x = origem["x"] + (destino["x"] - origem["x"]) / 2 + deslocamento
-        
-        colidiu = False
-        obstaculo_pos = None
-        for c_id, pos in posicoes_componentes.items():
-            if c_id == origem_id or c_id == destino_id:
-                continue
-            esquerda, direita = pos["x"] - (largura_comp / 2), pos["x"] + (largura_comp / 2)
-            topo, base = pos["y"] - (altura_comp / 2), pos["y"] + (altura_comp / 2)
-            
-            if (esquerda - 15) <= ponto_intermediario_x <= (direita + 15) and (topo - 15) <= origem["y"] <= (base + 15):
-                colidiu = True
-                obstaculo_pos = pos
-                break
+        if (esquerda - 15) <= ponto_intermediario_x <= (direita + 15) and (topo - 15) <= origem["y"] <= (base + 15):
+            colidiu = True
+            obstaculo_pos = pos
+            break
 
-        if colidiu and obstaculo_pos:
-            y_desvio = obstaculo_pos["y"] - (altura_comp / 2) - 30 - deslocamento
-            caminho = [
-                {"x": origem["x"], "y": origem["y"]},
-                {"x": origem["x"] + 30 + deslocamento, "y": origem["y"]},
-                {"x": origem["x"] + 30 + deslocamento, "y": y_desvio},
-                {"x": destino["x"] - 30 - deslocamento, "y": y_desvio},
-                {"x": destino["x"] - 30 - deslocamento, "y": destino["y"]},
-                {"x": destino["x"], "y": destino["y"]}
-            ]
-        else:
-            caminho = [
-                {"x": origem["x"], "y": origem["y"]},
-                {"x": ponto_intermediario_x, "y": origem["y"]},
-                {"x": ponto_intermediario_x, "y": destino["y"]},
-                {"x": destino["x"], "y": destino["y"]}
-            ]
-            
-        dados["caminho_geometria_json"] = caminho
-        resultados_fios.append(dados)
-
-# --- RENDERIZAÇÃO GRÁFICA DO DIAGRAMA ---
-if resultados_fios:
-    st.subheader("📊 Gráfico Dinâmico Gerado Real-Time")
-    fig, ax = plt.subplots(figsize=(12, 5), facecolor='#111111')
-    ax.set_facecolor('#111111')
-
-    # Desenha os componentes
-    for c_id, comp in posicoes_componentes.items():
-        cor_borda = '#ff4d4d' if c_id == 99 else '#007acc'
-        retangulo = plt.Rectangle((comp["x"] - (largura_comp/2), comp["y"] - (altura_comp/2)), 
-                                  largura_comp, altura_comp, fill=True, color='#222222', 
-                                  edgecolor=cor_borda, linewidth=2, zorder=3)
-        ax.add_patch(retangulo)
-        ax.text(comp["x"], comp["y"], f"{comp['nome']}\nID: {c_id}", color='white', 
-                ha='center', va='center', fontweight='bold', fontsize=9)
-
-    # Desenha os fios baseados na tabela/método selecionado
-    for fio in resultados_fios:
-        pontos = fio["caminho_geometria_json"]
-        xs = [p["x"] for p in pontos]
-        ys = [p["y"] for p in pontos]
-        
-        cor_fio_str = str(fio.get("cor_fio", "")).lower()
-        if "vermelho" in cor_fio_str:
-            cor_render = "red"
-        elif "preto" in cor_fio_str:
-            cor_render = "#555555" # Cinza visível para simular preto no fundo escuro
-        elif "azul" in cor_fio_str:
-            cor_render = "#1e90ff"
-        else:
-            cor_render = "white"
-            
-        ax.plot(xs, ys, color=cor_render, linewidth=2.5, zorder=2)
-
-    ax.set_xlim(50, 850)
-    ax.set_ylim(0, 450)
-    ax.axis('off')
-    st.pyplot(fig)
-else:
-    st.info("Insira ou carregue dados válidos para gerar o diagrama visual.")
+    if colidiu and obstaculo_pos:
+        y_desvio = obstaculo_pos["y"] - (altura_comp / 2) - 20 - deslocamento
+        caminho = [
+            {"x": origem["x"], "y": origem["y"]},
+            {"x": origem["x"] + 20 + deslocamento, "y": origem["y"]},
+            {"x": origem["x"] + 20 + deslocamento, "y": y_desvio},
+            {"x": destino["x"] - 20 - deslocamento, "y": y_desvio},
+            {"x": destino["x"] - 20 - deslocamento, "y": destino["y"]},
+            {"x": destino["x"], "y": destino["y"]}
+        ]
+    else:
+        caminho = [
+            {"x": origem["x"], "y": origem["y"]},
+            {"x": ponto_intermediario_x, "y": origem["y"]},
