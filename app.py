@@ -1,7 +1,19 @@
 import streamlit as st
-import json
 import os
 import matplotlib.pyplot as plt
+import json
+import streamlit as st
+
+# Exemplo se você estiver carregando de um arquivo enviado pelo usuário
+uploaded_file = st.file_uploader("Carregue o JSON corrigido", type=["json"])
+
+if uploaded_file is not None:
+    try:
+        dados = json.load(uploaded_file)
+        st.success("JSON lido com sucesso!")
+        st.write(dados)
+    except json.JSONDecodeError as e:
+        st.error(f"Erro de sintaxe no JSON: {e}")
 
 # Configuração da página do Streamlit
 st.set_page_config(page_title="Painel Elétrico - Streamlit", page_icon="⚡", layout="wide")
