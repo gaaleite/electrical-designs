@@ -132,7 +132,8 @@ elif metodo == "Carregar do Banco de Dados":
     banco = carregar_banco_projetos()
     projeto_selecionado = st.selectbox("Selecione:", list(banco.keys()))
     componentes_dados = banco[projeto_selecionado]["componentes"]
-    fios_dados = banco[projeto_selecion==]
+    fios_dados = banco[projeto_selecionado]["fios"]
+
 
 # --- PROCESSAMENTO DO ALGORITMO DE LOGÍSTICA/ROTEAMENTO ---
 posicoes_componentes = {c["id"]: {"x": c["x"], "y": c["y"], "nome": c.get("nome", f"Comp {c['id']}")} for c in componentes_dados}
