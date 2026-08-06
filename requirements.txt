@@ -1,6 +1,7 @@
-google-genai
+google-genai>=0.1.1
 streamlit>=1.35.0
+pandas>=2.0.0
+matplotlib>=3.8.0
+openpyxl>=3.1.0
 starlette<0.40.0
-uvicorn
-pandas
-matplotlib
+uvicorn>=0.25.0
