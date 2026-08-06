@@ -167,7 +167,7 @@ elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
             try:
                 origem = posicoes.get(int(fio["origem_id"]))
                 destino = posicoes.get(int(fio["destino_id"]))
-                if not hobbies or not destino: continue
+                if not origem or not destino: continue
                 
                 meio_x = (origem["x"] + destino["x"]) / 2
                 xs = [origem["x"], meio_x, meio_x, destino["x"]]
