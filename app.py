@@ -82,16 +82,16 @@ mapeamento_cores = {
 # ==========================================
 if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
-    # Alterado o texto explicativo de "modelo" para "Ampere"
-    st.markdown("Altere a marca e o Ampere na planilha abaixo e clique no botão para disparar a busca automática de preços comerciais na internet.")
+    # Removido "marca" do texto explicativo
+    st.markdown("Altere o Ampere na planilha abaixo e clique no botão para disparar a busca automática de preços comerciais na internet.")
 
-    # Alterado o parâmetro de 'modelo' para 'ampere'
-    def buscar_preco_api_aberta(marca, ampere, tipo):
-        if not marca or not ampere:
+    # Removido o parâmetro 'marca' da função
+    def buscar_preco_api_aberta(ampere, tipo):
+        if not ampere:
             return TABELA_PRECOS_PADRAO.get(tipo, 50.00)
             
-        # A query agora inclui o valor do Ampere em vez do modelo
-        query = f"preço comercial {tipo} {marca} {ampere}"
+        # A query agora utiliza apenas o tipo e o ampere
+        query = f"preço comercial {tipo} {ampere}"
         url = f"https://duckduckgo.com{urllib.parse.quote(query)}&format=json&no_html=1&skip_disambig=1"
         
         try:
@@ -117,24 +117,31 @@ if "1." in ambiente:
 
     st.subheader("📋 Lista de Materiais do Painel (BOM)")
     
+    # Ocultada a coluna "Marca" visualmente e renomeada a coluna "Modelo" para "Ampere"
     df_editado = st.data_editor(
         st.session_state["componentes"], 
         num_rows="dynamic", 
         use_container_width=True,
-        key="editor_web_orcamento"
+        key="editor_web_orcamento",
+        column_config={
+            "Marca": None,  # Isso esconde a coluna Marca da tabela do Streamlit
+            "Modelo": st.column_config.TextColumn(
+                "Ampere",
+                help="Digite a corrente em Ampere do dispositivo"
+            )
+        }
     )
     st.session_state["componentes"] = df_editado
 
     if st.button("🔍 Sincronizar e Buscar Preços na Web em Tempo Real", type="primary"):
         with st.spinner("Conectando aos servidores de mercado e atualizando cotações..."):
             for idx, row in df_editado.iterrows():
-                marca_item = str(row.get("Marca", ""))
-                # Alterado para buscar a coluna "Ampere" do seu DataFrame
-                ampere_item = str(row.get("Ampere", ""))
+                # Removida a leitura da linha 'Marca'
+                ampere_item = str(row.get("Modelo", ""))  # Lê da chave interna 'Modelo' que agora se chama 'Ampere' na tela
                 tipo_item = str(row.get("Tipo", ""))
                 
-                # Passando o ampere_item no lugar do antigo modelo
-                novo_preco = buscar_preco_api_aberta(marca_item, ampere_item, tipo_item)
+                # Chamada da função atualizada apenas com ampere e tipo
+                novo_preco = buscar_preco_api_aberta(ampere_item, tipo_item)
                 df_editado.at[idx, "Preco_Unitario"] = novo_preco
             
             st.session_state["componentes"] = df_editado
@@ -152,10 +159,10 @@ if "1." in ambiente:
         subtotal = p_unit * qtd
         total_general_painel += subtotal
         
-        # Alterado também no relatório final para exibir o Ampere
+        # Removida a marca do texto descritivo do dispositivo no relatório
         linhas_relatorio.append({
             "Componente": row.get("Tag/Nome", "Item"),
-            "Dispositivo": f"{row.get('Tipo', '')} ({row.get('Marca', '')} {row.get('Ampere', '')})",
+            "Dispositivo": f"{row.get('Tipo', '')} ({row.get('Modelo', '')})", # Exibe apenas Tipo (Ampere)
             "Quantidade": int(qtd),
             "Preço Unitário": f"R$ {p_unit:,.2f}",
             "Subtotal Comercial": f"R$ {subtotal:,.2f}"
