@@ -202,7 +202,6 @@ elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
         
         st.pyplot(fig)
 
-
 # ==========================================
 # AMBIENTE 3: ASSISTENTE DE IA COOPERATIVO
 # ==========================================
@@ -217,8 +216,15 @@ elif ambiente == "🤖 3. Assistente de IA Cooperativo (RAG/Upload)":
         accept_multiple_files=True
     )
     
+    conteudo_referencia = ""
     if projetos_referencia:
         st.info(f"📂 {len(projetos_referencia)} projeto(s) acoplado(s) à memória contextual do modelo.")
+        for p in projetos_referencia:
+            try:
+                conteudo_referencia += f"\n[Arquivo de Referência: {p.name}]\n"
+                conteudo_referencia += p.read().decode("utf-8", errors="ignore")[:2000]
+            except Exception:
+                continue
 
     prompt_ia = st.text_area(
         "Instruções do novo diagrama:",
@@ -233,9 +239,7 @@ elif ambiente == "🤖 3. Assistente de IA Cooperativo (RAG/Upload)":
             with st.spinner("Modelando arquitetura elétrica baseada nas referências..."):
                 try:
                     client_local = genai.Client(api_key=api_key_local.strip())
-                    
-                    # Leitura dos arquivos upados para injetar no sistema de contexto
-                    conteudo_referencia = ""
-                    for p in projetos_referencia:
-                        conteudo_referencia += f"\n[Arquivo de Referência: {p.name}]\n"
-                        conteudo_referencia += p.read().decode("utf-8", errors="ignore")[:2000] # Evita estouro de tokens de arquivos massivos
+
+                    esquema_saida = {
+                        "type": "OBJECT",
+                        "properties": {
