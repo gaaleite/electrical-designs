@@ -123,7 +123,7 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
 elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
     st.markdown('<div class="cad-header">📐 Canvas de Roteamento (Visualização CAD)</div>', unsafe_allow_html=True)
     
-    col_config, col_canvas = st.columns([1, 3])
+    col_config, col_canvas = st.columns()
     
     with col_config:
         st.subheader("Gerenciar Conexões")
@@ -168,7 +168,7 @@ elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
             ax.text(pos["x"], pos["y"], pos["nome"], ha='center', va='center', color='white', fontsize=10, fontweight='bold')
             
         # Processamento das linhas de fiação elétrica com desvios ortogonais
-        for _,fio in df_fios.iterrows():
+        for _, fio in df_fios.iterrows():
             try:
                 origem = posicoes.get(int(fio["origem_id"]))
                 destino = posicoes.get(int(fio["destino_id"]))
@@ -186,7 +186,7 @@ elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
                 # Desenha seta indicando direção da corrente
                 ax.annotate('', xy=(destino["x"], destino["y"]), xytext=(meio_x, destino["y"]),
                             arrowprops=dict(arrowstyle="->", color=cor_plot, lw=1.5))
-            except:
+            except Exception:
                 continue
 
         # Configurações do Grid Técnico CAD
@@ -201,6 +201,7 @@ elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
         ax.yaxis.set_tick_params(colors='#555555')
         
         st.pyplot(fig)
+
 
 # ==========================================
 # AMBIENTE 3: ASSISTENTE DE IA COOPERATIVO
@@ -238,4 +239,3 @@ elif ambiente == "🤖 3. Assistente de IA Cooperativo (RAG/Upload)":
                     for p in projetos_referencia:
                         conteudo_referencia += f"\n[Arquivo de Referência: {p.name}]\n"
                         conteudo_referencia += p.read().decode("utf-8", errors="ignore")[:2000] # Evita estouro de tokens de arquivos massivos
-
