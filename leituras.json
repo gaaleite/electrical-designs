@@ -1,72 +1,30 @@
 [
   {
-    "projeto_id": 101,
-    "componente_origem_id": 45,
-    "pino_origem": "2",
-    "componente_destino_id": 46,
-    "pino_destino": "1",
-    "bitola_mm2": 2.5,
+    "id_projeto": 101,
+    "origem_id": 45,
+    "destino_id": 46,
     "cor_fio": "Preto",
     "caminho_geometria_json": [
-      {
-        "x": 200,
-        "y": 200
-      },
-      {
-        "x": 230,
-        "y": 200
-      },
-      {
-        "x": 230,
-        "y": 100
-      },
-      {
-        "x": 670,
-        "y": 100
-      },
-      {
-        "x": 670,
-        "y": 200
-      },
-      {
-        "x": 700,
-        "y": 200
-      }
+      {"x": 200, "y": 200},
+      {"x": 230, "y": 200},
+      {"x": 230, "y": 100},
+      {"x": 670, "y": 100},
+      {"x": 670, "y": 200},
+      {"x": 700, "y": 200}
     ]
   },
   {
-    "projeto_id": 101,
-    "componente_origem_id": 45,
-    "pino_origem": "4",
-    "componente_destino_id": 46,
-    "pino_destino": "3",
-    "bitola_mm2": 1.5,
+    "id_projeto": 101,
+    "origem_id": 45,
+    "destino_id": 46,
     "cor_fio": "Vermelho",
     "caminho_geometria_json": [
-      {
-        "x": 200,
-        "y": 200
-      },
-      {
-        "x": 242,
-        "y": 200
-      },
-      {
-        "x": 242,
-        "y": 88
-      },
-      {
-        "x": 658,
-        "y": 88
-      },
-      {
-        "x": 658,
-        "y": 200
-      },
-      {
-        "x": 700,
-        "y": 200
-      }
+      {"x": 200, "y": 200},
+      {"x": 242, "y": 200},
+      {"x": 242, "y": 88},
+      {"x": 658, "y": 88},
+      {"x": 658, "y": 200},
+      {"x": 700, "y": 200}
     ]
   }
 ]
