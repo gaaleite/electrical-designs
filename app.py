@@ -199,11 +199,26 @@ for c_id, pos in posicoes_componentes.items():
     ax.add_patch(rect)
     ax.text(pos["x"], pos["y"], pos["nome"], ha='center', va='center', fontsize=9, fontweight='bold')
 
+# Dicionário para mapear cores em português ou inválidas para padrões do Matplotlib
+mapeamento_cores = {
+    "preto": "black",
+    "azul": "blue",
+    "vermelho": "red",
+    "verde": "green",
+    "amarelo": "yellow",
+    "cinza": "gray",
+    "branco": "white"
+}
+
 for fio in resultados_fios:
     caminho = fio["caminho_geometria_json"]
     xs = [p["x"] for p in caminho]
     ys = [p["y"] for p in caminho]
-    cor = fio.get("cor_fio", "Blue").lower()
+    
+    # Obtém a cor, remove espaços, padroniza para minúsculo e valida com o mapeamento
+    cor_crua = str(fio.get("cor_fio", "blue")).strip().lower()
+    cor = mapeamento_cores.get(cor_crua, "blue") # Caso não encontre no mapa, adota "blue" como padrão seguro
+    
     ax.plot(xs, ys, color=cor, linewidth=2, linestyle='-')
 
 ax.set_xlim(0, 1000)
@@ -211,4 +226,3 @@ ax.set_ylim(0, 600)
 ax.invert_yaxis()
 ax.axis('off')
 st.pyplot(fig)
-
