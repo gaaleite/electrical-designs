@@ -33,7 +33,7 @@ def carregar_banco_projetos():
 st.sidebar.header("🛠️ Método de Criação")
 metodo = st.sidebar.radio(
     "Escolha como deseja criar o projeto:",
-    ["Planilha Escrita (Manual)", "Inteligência Artificial (Prompt)", "Carregar do Banco de Dados"]
+    ["Planilha Escrita (Manual)", "Upload de Arquivo (CSV/Excel)", "Inteligência Artificial (Prompt)", "Carregar do Banco de Dados"]
 )
 
 # Definição dos valores padrão
@@ -57,6 +57,23 @@ if metodo == "Planilha Escrita (Manual)":
     ])
     df_editado = st.data_editor(df_inicial, num_rows="dynamic", use_container_width=True)
     fios_dados = df_editado.to_dict(orient="records")
+
+elif metodo == "Upload de Arquivo (CSV/Excel)":
+    st.subheader("📁 Upload de Projeto por Arquivo")
+    arquivo_carregado = st.file_uploader("Envie sua planilha de conexões (.csv, .xlsx):", type=["csv", "xlsx"])
+    
+    if arquivo_carregado is not None:
+        try:
+            if arquivo_carregado.name.endswith('.csv'):
+                df_Upload = pd.read_csv(arquivo_carregado)
+            else:
+                df_Upload = pd.read_excel(arquivo_carregado)
+                
+            st.success("📊 Arquivo carregado com sucesso!")
+            st.dataframe(df_Upload, use_container_width=True)
+            fios_dados = df_Upload.to_dict(orient="records")
+        except Exception as e:
+            st.error(f"Erro ao ler o arquivo: {e}")
 
 elif metodo == "Inteligência Artificial (Prompt)":
     st.subheader("🤖 Assistente de IA para Roteamento")
@@ -109,10 +126,10 @@ elif metodo == "Inteligência Artificial (Prompt)":
                     }
 
                     response = client_local.models.generate_content(
-    model='gemini-2.5-flash',  # <--- Altere para este modelo atualizado
-    contents=prompt_usuario,
-    config=types.GenerateContentConfig(
-                            system_instruction="Gere componentes industriais e conexões elétricas lógicas entre eles espalhados em X (100-800) e Y (100-400).",
+                        model='gemini-2.0-flash', 
+                        contents=prompt_usuario,
+                        config=types.GenerateContentConfig(
+                            system_instruction="Gere componentes industriais e conexões elétricas lógicas entre eles espalhados in X (100-800) e Y (100-400).",
                             response_mime_type="application/json",
                             response_schema=esquema_ia,
                             temperature=0.2
@@ -133,6 +150,7 @@ elif metodo == "Carregar do Banco de Dados":
     projeto_selecionado = st.selectbox("Selecione:", list(banco.keys()))
     componentes_dados = banco[projeto_selecionado]["componentes"]
     fios_dados = banco[projeto_selecionado]["fios"]
+
 
 
 # --- PROCESSAMENTO DO ALGORITMO DE LOGÍSTICA/ROTEAMENTO ---
