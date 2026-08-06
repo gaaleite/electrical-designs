@@ -89,7 +89,6 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
         if not marca or not modelo:
             return TABELA_PRECOS_PADRAO.get(tipo, 50.00)
             
-        # Monta um termo focado em busca comercial de e-commerce brasileiro
         query = f"preço comercial {tipo} {marca} {modelo}"
         url = f"https://duckduckgo.com{urllib.parse.quote(query)}&format=json&no_html=1&skip_disambig=1"
         
@@ -100,11 +99,7 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
             )
             with urllib.request.urlopen(req, timeout=5) as response:
                 dados_json = json.loads(response.read().decode('utf-8'))
-                
-                # Coleta todo o texto descritivo e de tópicos relacionados trazidos pelo buscador
                 texto_analise = dados_json.get("AbstractText", "") + " " + str(dados_json.get("RelatedTopics", ""))
-                
-                # Procura por valores em Reais (Ex: R$ 145,00 ou R$180.50)
                 valores = re.findall(r'R\$\s?(\d+[\.,]\d{2})', texto_analise)
                 
                 if valores:
@@ -112,16 +107,14 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
                     for v in valores:
                         v_limpo = v.replace('.', '').replace(',', '.')
                         precos_convertidos.append(float(v_limpo))
-                    return min(precos_convertidos) # Retorna a melhor oferta encontrada
+                    return min(precos_convertidos)
         except Exception:
             pass
             
-        # Fallback inteligente: Se a busca livre não retornar valores explícitos, busca na tabela local por categoria
         return TABELA_PRECOS_PADRAO.get(tipo, 50.00)
 
     st.subheader("📋 Lista de Materiais do Painel (BOM)")
     
-    # Exibe a planilha para edição de quantidades, marcas e modelos
     df_editado = st.data_editor(
         st.session_state["componentes"], 
         num_rows="dynamic", 
@@ -130,7 +123,6 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
     )
     st.session_state["componentes"] = df_editado
 
-    # Mecanismo de ativação sob demanda para evitar travamentos de tela
     if st.button("🔍 Sincronizar e Buscar Preços na Web em Tempo Real", type="primary"):
         with st.spinner("Conectando aos servidores de mercado e atualizando cotações..."):
             for idx, row in df_editado.iterrows():
@@ -138,7 +130,6 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
                 modelo_item = str(row.get("Modelo", ""))
                 tipo_item = str(row.get("Tipo", ""))
                 
-                # Executa a busca
                 novo_preco = buscar_preco_api_aberta(marca_item, modelo_item, tipo_item)
                 df_editado.at[idx, "Preco_Unitario"] = novo_preco
             
@@ -146,7 +137,6 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
             st.success("Tabela de preços sincronizada com a web com sucesso!")
             st.rerun()
 
-    # Consolidação matemática do custo do projeto
     total_geral_painel = 0.0
     linhas_relatorio = []
 
@@ -166,7 +156,6 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
             "Subtotal Comercial": f"R$ {subtotal:,.2f}"
         })
 
-    # Painel visual de KPIs Financeiros
     st.markdown("---")
     col1, col2 = st.columns(2)
     with col1:
@@ -217,3 +206,18 @@ elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
                 ys = [origem["y"], origem["y"], destino["y"], destino["y"]]
                 cor_plot = mapeamento_cores.get(str(fio.get("cor_fio", "Azul")).strip().lower(), "cyan")
                 ax.plot(xs, ys, color=cor_plot, linewidth=2)
+                ax.annotate('', xy=(destino["x"], destino["y"]), xytext=(meio_x, destino["y"]), arrowprops=dict(arrowstyle="->", color=cor_plot, lw=1.5))
+            except Exception:
+                continue
+
+        ax.set_xlim(0, 1000)
+        ax.set_ylim(0, 500)
+        ax.grid(True, color='#252525', linestyle='--', linewidth=0.5)
+        ax.invert_yaxis()
+        for spine in ax.spines.values(): spine.set_visible(False)
+        st.pyplot(fig)
+
+# ==========================================
+# AMBIENTE 3: ASSISTENTE DE IA COOPERATIVO
+# ==========================================
+elif ambiente == "🤖 3. Assistente de IA Cooperativo (RAG/Upload)":
