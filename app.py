@@ -25,7 +25,7 @@ st.markdown("""
 
 st.title("⚡ CAD & Roteador Industrial Inteligente")
 
-# --- BANCO DE PREÇOS AUXILIAR (Se a busca web não encontrar nada específico) ---
+# --- BANCO DE PREÇOS AUXILIAR ---
 TABELA_PRECOS_PADRAO = {
     "Disjuntor Motor": 180.00,
     "Disjuntor Trifásico": 120.00,
@@ -80,11 +80,10 @@ mapeamento_cores = {
 # ==========================================
 # AMBIENTE 1: DIMENSIONAMENTO E ORÇAMENTO
 # ==========================================
-if ambiente == "📊 1. Dimensionamento e Orçamento":
+if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
     st.markdown("Altere a marca e o modelo na planilha abaixo e clique no botão para disparar a busca automática de preços comerciais na internet.")
 
-    # Função Avançada de Extração via API Pública Livre do DuckDuckGo
     def buscar_preco_api_aberta(marca, modelo, tipo):
         if not marca or not modelo:
             return TABELA_PRECOS_PADRAO.get(tipo, 50.00)
@@ -170,7 +169,7 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
 # ==========================================
 # AMBIENTE 2: DIAGRAMA E LAYOUT (AUTOCAD)
 # ==========================================
-elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
+if "2." in ambiente:
     st.markdown('<div class="cad-header">📐 Canvas de Roteamento (Visualização CAD)</div>', unsafe_allow_html=True)
     col_config, col_canvas = st.columns()
     
@@ -200,7 +199,7 @@ elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
             try:
                 origem = posicoes.get(int(fio["origem_id"]))
                 destino = posicoes.get(int(fio["destino_id"]))
-                if not origem or not destino: continue
+                if not起源 or not destino: continue
                 meio_x = (origem["x"] + destino["x"]) / 2
                 xs = [origem["x"], meio_x, meio_x, destino["x"]]
                 ys = [origem["y"], origem["y"], destino["y"], destino["y"]]
@@ -220,4 +219,6 @@ elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
 # ==========================================
 # AMBIENTE 3: ASSISTENTE DE IA COOPERATIVO
 # ==========================================
-elif ambiente == "🤖 3. Assistente de IA Cooperativo (RAG/Upload)":
+if "3." in ambiente:
+    st.markdown('<div class="cad-header">🤖 Engenharia Assistida por IA</div>', unsafe_allow_html=True)
+    st.info("Módulo de comunicação de IA pausado temporariamente para alinhamento das tabelas comerciais.")
