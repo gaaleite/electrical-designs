@@ -22,30 +22,33 @@ CREATE TABLE catalogo_pinos (
     UNIQUE(catalogo_id, nome_pino)
 );
 
--- 3. COMPONENTES DO PROJETO (Os itens que o usuário colocou no circuito)
+-- 3. COMPONENTES DO PROJETO (Sincronizado com Pandas e Streamlit Session State)
 CREATE TABLE componentes_projeto (
-    id SERIAL PRIMARY KEY,
+    id INT NOT NULL, -- ID sequencial controlado pela lógica do projeto
     projeto_id INT NOT NULL, -- Identificador do projeto do usuário
-    tag VARCHAR(20) NOT NULL, -- Ex: 'K1', 'F1', 'Q1' (Identificação elétrica)
+    tag_nome VARCHAR(50) NOT NULL, -- Mapeado de 'Tag/Nome' para o DataFrame
+    tipo_equipamento VARCHAR(100), -- Mapeado de 'Tipo' para o DataFrame
+    quantidade INT DEFAULT 1, -- Mapeado de 'Qtd' para o DataFrame
     catalogo_id INT REFERENCES catalogo_componentes(id),
-    -- Coordenadas calculadas pelo seu algoritmo de Layout Físico
+    -- Coordenadas calculadas pelo algoritmo de Layout Físico
     layout_x NUMERIC(8,2) DEFAULT 0.0,
     layout_y NUMERIC(8,2) DEFAULT 0.0,
-    layout_trilho_id INT -- Identifica em qual trilho DIN do painel ele foi alocado
+    layout_trilho_id INT, -- Identifica em qual trilho DIN do painel ele foi alocado
+    PRIMARY KEY (projeto_id, id) -- Chave composta para permitir múltiplos projetos
 );
 
--- 4. A NETLIST / CONEXÕES (Os fios do circuito)
+-- 4. A NETLIST / CONEXÕES (Sincronizado com as rotas do AutoCAD e IA)
 CREATE TABLE conexoes_fios (
     id SERIAL PRIMARY KEY,
     projeto_id INT NOT NULL,
     
-    -- Origem da conexão
-    componente_origem_id INT REFERENCES componentes_projeto(id) ON DELETE CASCADE,
-    pino_origem VARCHAR(10) NOT NULL,
+    -- Origem da conexão (Refere-se ao id do componente no mesmo projeto)
+    origem_id INT NOT NULL,
+    pino_origem VARCHAR(10),
     
-    -- Destino da conexão
-    componente_destino_id INT REFERENCES componentes_projeto(id) ON DELETE CASCADE,
-    pino_destino VARCHAR(10) NOT NULL,
+    -- Destino da conexão (Refere-se ao id do componente no mesmo projeto)
+    destino_id INT NOT NULL,
+    pino_destino VARCHAR(10),
     
     -- Propriedades do Fio/Cabo
     bitola_mm2 NUMERIC(4,2) DEFAULT 1.5,
@@ -53,5 +56,9 @@ CREATE TABLE conexoes_fios (
     tag_fio VARCHAR(50), -- Identificação da anilha do fio
     
     -- Dados para o algoritmo de roteamento desenhar as linhas
-    caminho_geometria_json JSONB -- Guarda os pontos [x,y] por onde a linha do diagrama deve passar
+    caminho_geometria_json JSONB, -- Guarda os pontos [x,y] por onde a linha do diagrama deve passar
+    
+    -- Restrição de chave estrangeira composta garantindo integridade com os componentes existentes
+    FOREIGN KEY (projeto_id, origem_id) REFERENCES componentes_projeto(projeto_id, id) ON DELETE CASCADE,
+    FOREIGN KEY (projeto_id, destino_id) REFERENCES componentes_projeto(projeto_id, id) ON DELETE CASCADE
 );
