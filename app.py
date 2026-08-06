@@ -230,9 +230,8 @@ elif ambiente == "🤖 3. Assistente de IA Cooperativo (RAG/Upload)":
                 try:
                     client_local = genai.Client(api_key=api_key_local.strip())
 
-                    # Blindagem absoluta contra erros de chaves do Python usando string pura convertida em JSON
-                    string_esquema = """
-                    {
+                    # Estruturação limpa do dicionário Python eliminando strings multilinhas perigosas
+                    esquema_saida = {
                         "type": "OBJECT",
                         "properties": {
                             "componentes": {
@@ -245,3 +244,4 @@ elif ambiente == "🤖 3. Assistente de IA Cooperativo (RAG/Upload)":
                                         "Tipo": {"type": "STRING"},
                                         "Qtd": {"type": "INTEGER"}
                                     },
+                                    "required": ["id", "Tag/Nome", "Tipo", "Qtd"]
