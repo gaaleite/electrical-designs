@@ -82,13 +82,16 @@ mapeamento_cores = {
 # ==========================================
 if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
-    st.markdown("Altere a marca e o modelo na planilha abaixo e clique no botão para disparar a busca automática de preços comerciais na internet.")
+    # Alterado o texto explicativo de "modelo" para "Ampere"
+    st.markdown("Altere a marca e o Ampere na planilha abaixo e clique no botão para disparar a busca automática de preços comerciais na internet.")
 
-    def buscar_preco_api_aberta(marca, modelo, tipo):
-        if not marca or not modelo:
+    # Alterado o parâmetro de 'modelo' para 'ampere'
+    def buscar_preco_api_aberta(marca, ampere, tipo):
+        if not marca or not ampere:
             return TABELA_PRECOS_PADRAO.get(tipo, 50.00)
             
-        query = f"preço comercial {tipo} {marca} {modelo}"
+        # A query agora inclui o valor do Ampere em vez do modelo
+        query = f"preço comercial {tipo} {marca} {ampere}"
         url = f"https://duckduckgo.com{urllib.parse.quote(query)}&format=json&no_html=1&skip_disambig=1"
         
         try:
@@ -126,10 +129,12 @@ if "1." in ambiente:
         with st.spinner("Conectando aos servidores de mercado e atualizando cotações..."):
             for idx, row in df_editado.iterrows():
                 marca_item = str(row.get("Marca", ""))
-                modelo_item = str(row.get("Modelo", ""))
+                # Alterado para buscar a coluna "Ampere" do seu DataFrame
+                ampere_item = str(row.get("Ampere", ""))
                 tipo_item = str(row.get("Tipo", ""))
                 
-                novo_preco = buscar_preco_api_aberta(marca_item, modelo_item, tipo_item)
+                # Passando o ampere_item no lugar do antigo modelo
+                novo_preco = buscar_preco_api_aberta(marca_item, ampere_item, tipo_item)
                 df_editado.at[idx, "Preco_Unitario"] = novo_preco
             
             st.session_state["componentes"] = df_editado
@@ -147,9 +152,10 @@ if "1." in ambiente:
         subtotal = p_unit * qtd
         total_general_painel += subtotal
         
+        # Alterado também no relatório final para exibir o Ampere
         linhas_relatorio.append({
             "Componente": row.get("Tag/Nome", "Item"),
-            "Dispositivo": f"{row.get('Tipo', '')} ({row.get('Marca', '')} {row.get('Modelo', '')})",
+            "Dispositivo": f"{row.get('Tipo', '')} ({row.get('Marca', '')} {row.get('Ampere', '')})",
             "Quantidade": int(qtd),
             "Preço Unitário": f"R$ {p_unit:,.2f}",
             "Subtotal Comercial": f"R$ {subtotal:,.2f}"
@@ -165,6 +171,7 @@ if "1." in ambiente:
     st.subheader("🛒 Relatório Consolidado para Orçamento Comercial")
     if linhas_relatorio:
         st.dataframe(pd.DataFrame(linhas_relatorio), use_container_width=True)
+
 
 # ==========================================
 # AMBIENTE 2: DIAGRAMA E LAYOUT (AUTOCAD)
