@@ -173,6 +173,7 @@ if "1." in ambiente:
         st.dataframe(pd.DataFrame(linhas_relatorio), use_container_width=True)
 
 
+
 # ==========================================
 # AMBIENTE 2: DIAGRAMA E LAYOUT (AUTOCAD)
 # ==========================================
