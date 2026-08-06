@@ -137,7 +137,7 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
             st.success("Tabela de preços sincronizada com a web com sucesso!")
             st.rerun()
 
-    total_geral_painel = 0.0
+    total_general_painel = 0.0
     linhas_relatorio = []
 
     for _, row in df_editado.iterrows():
@@ -146,7 +146,7 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
         p_unit = float(row.get("Preco_Unitario", 0.0))
         
         subtotal = p_unit * qtd
-        total_geral_painel += subtotal
+        total_general_painel += subtotal
         
         linhas_relatorio.append({
             "Componente": row.get("Tag/Nome", "Item"),
@@ -159,7 +159,7 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
     st.markdown("---")
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f'<div class="metric-box"><h4>Valor de Aquisição de Materiais</h4><h2>R$ {total_geral_painel:,.2f}</h2></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-box"><h4>Valor de Aquisição de Materiais</h4><h2>R$ {total_general_painel:,.2f}</h2></div>', unsafe_allow_html=True)
     with col2:
         st.markdown(f'<div class="metric-box"><h4>Componentes Ativos na Lista</h4><h2>{int(df_editado["Qtd"].sum() if "Qtd" in df_editado.columns else 0)} unidades</h2></div>', unsafe_allow_html=True)
 
