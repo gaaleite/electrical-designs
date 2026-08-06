@@ -95,7 +95,7 @@ if ambiente == "📊 1. Dimensionamento e Orçamento":
         qtd = pd.to_numeric(row.get("Qtd", 0), errors='coerce')
         if pd.isna(qtd): qtd = 0
             
-        preco_unit = TABELA_PRECOS.get(tipo, 50.00) # R$50 padrão para itens genéricos
+        preco_unit = TABELA_PRECOS.get(tipo, 50.00) 
         subtotal = preco_unit * qtd
         total_painel += subtotal
         itens_cotados.append({
@@ -136,11 +136,9 @@ elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
         st.session_state["conexoes"] = df_fios
         
     with col_canvas:
-        # Geração dinâmica de coordenadas geométricas baseadas no ID para simular o Grid
         comp_df = st.session_state["componentes"]
         posicoes = {}
         
-        # Distribui componentes de forma horizontal uniforme no Grid do painel
         passo_x = 800 / (len(comp_df) if len(comp_df) > 0 else 1)
         for i, (_, row) in enumerate(comp_df.iterrows()):
             c_id = row.get("id")
@@ -151,13 +149,11 @@ elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
                 "nome": str(row.get("Tag/Nome", f"ID {c_id}"))
             }
 
-        # Inicialização do Canvas com Estilo Fundo Escuro do AutoCAD (Grid)
         fig, ax = plt.subplots(figsize=(11, 6), facecolor='#151515')
         ax.set_facecolor('#151515')
         
         largura_box, altura_box = 80, 110
         
-        # Desenha os cubículos/componentes no padrão técnico
         for c_id, pos in posicoes.items():
             rect = plt.Rectangle(
                 (pos["x"] - largura_box/2, pos["y"] - altura_box/2), 
@@ -167,14 +163,12 @@ elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
             ax.add_patch(rect)
             ax.text(pos["x"], pos["y"], pos["nome"], ha='center', va='center', color='white', fontsize=10, fontweight='bold')
             
-        # Processamento das linhas de fiação elétrica com desvios ortogonais
         for _, fio in df_fios.iterrows():
             try:
                 origem = posicoes.get(int(fio["origem_id"]))
                 destino = posicoes.get(int(fio["destino_id"]))
                 if not origem or not destino: continue
                 
-                # Geometria Ortogonal (Linhas retas tipo CAD)
                 meio_x = (origem["x"] + destino["x"]) / 2
                 xs = [origem["x"], meio_x, meio_x, destino["x"]]
                 ys = [origem["y"], origem["y"], destino["y"], destino["y"]]
@@ -183,19 +177,16 @@ elif ambiente == "📐 2. Diagrama e Layout (Estilo AutoCAD)":
                 cor_plot = mapeamento_cores.get(cor_crua, "cyan")
                 
                 ax.plot(xs, ys, color=cor_plot, linewidth=2, linestyle='-')
-                # Desenha seta indicando direção da corrente
                 ax.annotate('', xy=(destino["x"], destino["y"]), xytext=(meio_x, destino["y"]),
                             arrowprops=dict(arrowstyle="->", color=cor_plot, lw=1.5))
             except Exception:
                 continue
 
-        # Configurações do Grid Técnico CAD
         ax.set_xlim(0, 1000)
         ax.set_ylim(0, 500)
         ax.grid(True, color='#252525', linestyle='--', linewidth=0.5)
         ax.invert_yaxis()
         
-        # Remove bordas padrão mantendo apenas o grid interno escuro
         for spine in ax.spines.values(): spine.set_visible(False)
         ax.xaxis.set_tick_params(colors='#555555')
         ax.yaxis.set_tick_params(colors='#555555')
@@ -209,7 +200,6 @@ elif ambiente == "🤖 3. Assistente de IA Cooperativo (RAG/Upload)":
     st.markdown('<div class="cad-header">🤖 Engenharia Assistida por IA</div>', unsafe_allow_html=True)
     st.markdown("Suba arquivos de projetos anteriores (.json, .csv) e utilize a IA contextualizada para projetar novos diagramas.")
 
-    # Área de Contextualização de Projetos Anteriores (Base de Conhecimento)
     projetos_referencia = st.file_uploader(
         "Upload de Projetos Base (Alimente a memória da IA):", 
         type=["json", "csv", "xlsx"], 
@@ -243,3 +233,18 @@ elif ambiente == "🤖 3. Assistente de IA Cooperativo (RAG/Upload)":
                     esquema_saida = {
                         "type": "OBJECT",
                         "properties": {
+                            "componentes": {
+                                "type": "ARRAY",
+                                "items": {
+                                    "type": "OBJECT",
+                                    "properties": {
+                                        "id": {"type": "INTEGER"},
+                                        "Tag/Nome": {"type": "STRING"},
+                                        "Tipo": {"type": "STRING"},
+                                        "Qtd": {"type": "INTEGER"}
+                                    },
+                                    "required": ["id", "Tag/Nome", "Tipo", "Qtd"]
+                                }
+                            },
+                            "fios": {
+
