@@ -72,34 +72,91 @@ mapeamento_cores = {
 # AMBIENTE 1: DIMENSIONAMENTO E ORÇAMENTO
 # ==========================================
 if ambiente == "📊 1. Dimensionamento e Orçamento":
-    st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Custos</div>', unsafe_allow_html=True)
-    df_editado = st.data_editor(st.session_state["componentes"], num_rows="dynamic", use_container_width=True, key="editor_componentes")
+    st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Custos Avançado</div>', unsafe_allow_html=True)
+    st.markdown("Insira a marca e o modelo para que o sistema busque e calcule o valor de mercado de cada dispositivo automaticamente.")
+
+    # MOCK EXPANDIDO DE COMPONENTES COM MARCA, MODELO E SEUS PREÇOS REALISTAS
+    # Em produção, essa busca seria um 'SELECT preco FROM catalogo_componentes WHERE fabricante = X AND modelo = Y'
+    BANCO_PRECOS_COMERCIAIS = {
+        ("WEG", "CWM9"): 145.00,
+        ("WEG", "MDW-C16"): 22.50,
+        ("WEG", "MPW25"): 180.00,
+        ("Siemens", "3RT"): 195.00,
+        ("Siemens", "5SY"): 38.00,
+        ("Schneider", "EasyPact"): 135.00,
+        ("Schneider", "Acti9"): 45.00,
+        ("Clamper", "VCL"): 110.00
+    }
+
+    # Atualiza a estrutura inicial da sessão para conter Marca e Modelo se ainda não existirem
+    if "Tag/Nome" in st.session_state["componentes"].columns and "Marca" not in st.session_state["componentes"].columns:
+        st.session_state["componentes"] = pd.DataFrame([
+            {"id": 1, "Tag/Nome": "QG1 (Geral)", "Tipo": "Chave Seccionadora", "Marca": "WEG", "Modelo": "MPW25", "Qtd": 1},
+            {"id": 2, "Tag/Nome": "K1", "Tipo": "Contator de Potência", "Marca": "WEG", "Modelo": "CWM9", "Qtd": 1},
+            {"id": 3, "Tag/Nome": "F1", "Tipo": "Disjuntor Trifásico", "Marca": "Siemens", "Modelo": "5SY", "Qtd": 16},
+            {"id": 4, "Tag/Nome": "DPS1", "Tipo": "Bloco DPS", "Marca": "Clamper", "Modelo": "VCL", "Qtd": 1}
+        ])
+
+    st.subheader("📋 Lista de Materiais do Painel (BOM)")
+    
+    # Exibe o editor de dados com as novas colunas obrigatórias de busca comercial
+    df_editado = st.data_editor(
+        st.session_state["componentes"], 
+        num_rows="dynamic", 
+        use_container_width=True,
+        key="editor_componentes_comercial"
+    )
     st.session_state["componentes"] = df_editado
 
+    # Inicialização das variáveis de cálculo financeiro
     total_painel = 0.0
     itens_cotados = []
+    
+    # Executa a varredura e busca de preços automática linha por linha
     for _, row in df_editado.iterrows():
-        tipo = row.get("Tipo", "")
+        tipo = str(row.get("Tipo", "Genérico"))
+        marca = str(row.get("Marca", "")).strip()
+        modelo = str(row.get("Modelo", "")).strip()
         qtd = pd.to_numeric(row.get("Qtd", 0), errors='coerce')
-        if pd.isna(qtd): qtd = 0
-        preco_unit = TABELA_PRECOS.get(tipo, 50.00) 
+        if pd.isna(qtd): 
+            qtd = 0
+            
+        # Tenta buscar o preço exato pela combinação de (Marca, Modelo)
+        preco_unit = BANCO_PRECOS_COMERCIAIS.get((marca, modelo))
+        
+        # Fallback 1: Se não achar o modelo exato, busca um preço médio pela categoria/Tipo
+        if preco_unit is None:
+            preco_unit = TABELA_PRECOS.get(tipo, 50.00) # R$ 50.00 como taxa padrão se for totalmente novo
+            status_preco = "⚠️ Preço Médio Estimado"
+        else:
+            status_preco = "✅ Preço Comercial Encontrado"
+            
         subtotal = preco_unit * qtd
         total_painel += subtotal
+        
         itens_cotados.append({
             "Componente": row.get("Tag/Nome", f"Comp_{row.get('id')}"),
-            "Especificação": tipo,
-            "Qtd": qtd,
-            "Preço Unitário (R$)": f"R$ {preco_unit:,.2f}",
-            "Subtotal (R$)": f"R$ {subtotal:,.2f}"
+            "Marca / Modelo": f"{marca} - {modelo}" if marca and modelo else "Não Informado",
+            "Qtd": int(qtd),
+            "Preço Unitário": f"R$ {preco_unit:,.2f}",
+            "Subtotal": f"R$ {subtotal:,.2f}",
+            "Status da Busca": status_preco
         })
 
+    # Painel Dinâmico de Indicadores (Financeiro e Volumetria)
     st.markdown("---")
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f'<div class="metric-box"><h4>Custo Estimado do Painel</h4><h2>R$ {total_painel:,.2f}</h2></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-box"><h4>Custo Consolidado de Materiais</h4><h2>R$ {total_painel:,.2f}</h2></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown(f'<div class="metric-box"><h4>Total de Dispositivos Ativos</h4><h2>{int(df_editado["Qtd"].sum())} unidades</h2></div>', unsafe_allow_html=True)
-    st.table(pd.DataFrame(itens_cotados))
+        st.markdown(f'<div class="metric-box"><h4>Total de Itens Orçados</h4><h2>{int(df_editado["Qtd"].sum() if "Qtd" in df_editado.columns else 0)} componentes</h2></div>', unsafe_allow_html=True)
+
+    st.subheader("🛒 Relatório de Cotação de Fornecedores")
+    if itens_cotados:
+        st.dataframe(pd.DataFrame(itens_cotados), use_container_width=True)
+    else:
+        st.info("Nenhum material adicionado à planilha até o momento.")
+
 
 # ==========================================
 # AMBIENTE 2: DIAGRAMA E LAYOUT (AUTOCAD)
