@@ -179,10 +179,8 @@ for fio in fios_dados:
         y_desvio = obstaculo_pos["y"] - (altura_comp / 2) - 20 - deslocamento
         dados["caminho_geometria_json"] = [
             {"x": origem["x"], "y": origem["y"]},
-            {"x": origem["x"] + 20 + deslocamento, "y": broom["y"] if "broom" in locals() else origem["y"]},
+            {"x": origem["x"] + 20 + deslocamento, "y": origem["y"]},
             {"x": origem["x"] + 20 + deslocamento, "y": y_desvio},
-            {"x": destino["x"] - 20 - deslocamento, "y": y_desvio},
-            {"x": destino["x"] - 20 - deslocamento, "y": destino["y"]},
             {"x": destino["x"], "y": destino["y"]}
         ]
     else:
@@ -192,29 +190,25 @@ for fio in fios_dados:
             {"x": ponto_intermediario_x, "y": destino["y"]},
             {"x": destino["x"], "y": destino["y"]}
         ]
-        
     resultados_fios.append(dados)
 
-# --- MAPA VISUAL DO PAINEL ELÉTRICO ---
-if componentes_dados:
-    st.subheader("📊 Gráfico Dinâmico Gerado Real-Time")
-    fig, ax = plt.subplots(figsize=(14, 6), facecolor='#111111')
-    ax.set_facecolor('#111111')
+# --- RENDERIZAÇÃO GRÁFICA (Matplotlib) ---
+fig, ax = plt.subplots(figsize=(10, 5))
+for c_id, pos in posicoes_componentes.items():
+    rect = plt.Rectangle((pos["x"] - largura_comp/2, pos["y"] - altura_comp/2), largura_comp, altura_comp, facecolor='lightgray', edgecolor='black')
+    ax.add_patch(rect)
+    ax.text(pos["x"], pos["y"], pos["nome"], ha='center', va='center', fontsize=9, fontweight='bold')
 
-    for c_id, comp in posicoes_componentes.items():
-        retangulo = plt.Rectangle((comp["x"] - (largura_comp/2), comp["y"] - (altura_comp/2)), largura_comp, altura_comp, fill=True, color='#222222', edgecolor='#007acc', linewidth=1.5, zorder=3)
-        ax.add_patch(retangulo)
-        ax.text(comp["x"], comp["y"], f"{comp['nome']}\nID: {c_id}", color='white', ha='center', va='center', fontweight='bold', fontsize=7)
+for fio in resultados_fios:
+    caminho = fio["caminho_geometria_json"]
+    xs = [p["x"] for p in caminho]
+    ys = [p["y"] for p in caminho]
+    cor = fio.get("cor_fio", "Blue").lower()
+    ax.plot(xs, ys, color=cor, linewidth=2, linestyle='-')
 
-    for fio in resultados_fios:
-        pontos = fio["caminho_geometria_json"]
-        xs = [p["x"] for p in pontos]
-        ys = [p["y"] for p in pontos]
-        cor_fio_str = str(fio.get("cor_fio", "")).lower()
-        cor_render = "red" if "vermelho" in cor_fio_str else ("#666666" if "preto" in cor_fio_str else ("#1e90ff" if "azul" in cor_fio_str else "white"))
-        ax.plot(xs, ys, color=cor_render, linewidth=1.5, zorder=2)
+ax.set_xlim(0, 1000)
+ax.set_ylim(0, 600)
+ax.invert_yaxis()
+ax.axis('off')
+st.pyplot(fig)
 
-    ax.set_xlim(50, 850)
-    ax.set_ylim(0, 500)
-    ax.axis('off')
-    st.pyplot(fig)
