@@ -1,64 +1,106 @@
--- 1. CATÁLOGO DE FABRICANTES (Cadastro de Componentes Comerciais)
-CREATE TABLE catalogo_componentes (
-    id SERIAL PRIMARY KEY,
-    fabricante VARCHAR(100) NOT NULL,
-    modelo VARCHAR(100) NOT NULL UNIQUE,
-    descricao TEXT,
-    categoria VARCHAR(50), -- Ex: 'Contator', 'Disjuntor', 'CLP'
-    dimensao_largura_mm NUMERIC(6,2) NOT NULL,
-    dimensao_altura_mm NUMERIC(6,2) NOT NULL,
-    dimensao_profundidade_mm NUMERIC(6,2) NOT NULL,
-    imagem_simbolo_svg TEXT -- Caminho ou string do desenho base do componente
-);
+-- ============================================================================
+-- 1. CADASTRO DE COMPONENTES NO CATÁLOGO (catalogo_componentes)
+-- ============================================================================
+INSERT INTO catalogo_componentes 
+    (fabricante, modelo, descricao, categoria, dimensao_largura_mm, dimensao_altura_mm, dimensao_profundidade_mm, imagem_simbolo_svg)
+VALUES
+    -- DISJUNTORES TERMOMAGNÉTICOS DIN
+    ('ABB', 'S203-C63', 'Disjuntor Termomagnético Tripolar Curva C 63A 6kA DIN', 'Disjuntor', 52.50, 88.00, 69.00, '<svg>...</svg>'),
+    ('Siemens', '5SL6363-7', 'Disjuntor Termomagnético Tripolar Curva C 63A 6kA DIN', 'Disjuntor', 54.00, 90.00, 70.00, '<svg>...</svg>'),
+    ('WEG', 'MDW-C63-3', 'Minidisjuntor Curva C Trifásico 63A 5kA DIN', 'Disjuntor', 54.00, 81.00, 75.00, '<svg>...</svg>'),
+    ('Steck', 'SDD3C63', 'Minidisjuntor Curva C Trifásico 63A 3kA DIN', 'Disjuntor', 54.00, 80.00, 76.00, '<svg>...</svg>'),
+    ('Sibratec', 'JXB3-C63', 'Minidisjuntor Trifásico Curva C 63A 4.5kA DIN', 'Disjuntor', 54.00, 80.00, 73.00, '<svg>...</svg>'),
+    ('Brum', 'BD3-C63', 'Minidisjuntor Trifásico Curva C 63A 3kA DIN', 'Disjuntor', 54.00, 81.00, 74.00, '<svg>...</svg>'),
 
--- 2. CADASTRO DE PINOS DO CATÁLOGO (Quais bornes esse modelo possui)
-CREATE TABLE catalogo_pinos (
-    id SERIAL PRIMARY KEY,
-    catalogo_id INT REFERENCES catalogo_componentes(id) ON DELETE CASCADE,
-    nome_pino VARCHAR(10) NOT NULL, -- Ex: 'A1', 'A2', '1', '2', 'L1'
-    tipo_sinal VARCHAR(30), -- Ex: 'Potencia', 'Comando', 'Terra', 'VDC'
-    posicao_relativa_x NUMERIC(5,2), -- Onde o pino fica desenhado dentro do símbolo (0.0 a 1.0)
-    posicao_relativa_y NUMERIC(5,2),
-    UNIQUE(catalogo_id, nome_pino)
-);
+    -- CONTATORAS DE POTÊNCIA
+    ('ABB', 'AF30-30-00-13', 'Contator de Potência 32A 100-250Vca/cc Bobina Eletrônica', 'Contatora', 45.00, 86.00, 77.00, '<svg>...</svg>'),
+    ('Siemens', '3RT2027-1AP00', 'Contator de Potência Sirius 3RT2 32A 220Vca 50/60Hz', 'Contatora', 45.00, 85.00, 97.00, '<svg>...</svg>'),
+    ('WEG', 'CWM32-00-30V24', 'Contator de Potência CWM Linha Industrial 32A 220Vca', 'Contatora', 45.00, 87.00, 93.00, '<svg>...</svg>'),
+    ('Steck', 'SK1-3210M7', 'Contator de Potência Linha SK1 32A 220Vca 1NA', 'Contatora', 56.00, 84.00, 98.00, '<svg>...</svg>'),
+    ('Sibratec', 'CJX2-3210', 'Contator de Potência Tripolar 32A 220Vca 1NA', 'Contatora', 57.00, 86.00, 100.00, '<svg>...</svg>'),
+    ('Brum', 'BC32-00', 'Contator de Potência Tripolar Linha BC 32A 220Vca', 'Contatora', 56.00, 85.00, 98.00, '<svg>...</svg>'),
 
--- 3. COMPONENTES DO PROJETO (Sincronizado com Pandas e Streamlit Session State)
-CREATE TABLE componentes_projeto (
-    id INT NOT NULL, -- ID sequencial controlado pela lógica do projeto
-    projeto_id INT NOT NULL, -- Identificador do projeto do usuário
-    tag_nome VARCHAR(50) NOT NULL, -- Mapeado de 'Tag/Nome' para o DataFrame
-    tipo_equipamento VARCHAR(100), -- Mapeado de 'Tipo' para o DataFrame
-    quantidade INT DEFAULT 1, -- Mapeado de 'Qtd' para o DataFrame
-    catalogo_id INT REFERENCES catalogo_componentes(id),
-    -- Coordenadas calculadas pelo algoritmo de Layout Físico
-    layout_x NUMERIC(8,2) DEFAULT 0.0,
-    layout_y NUMERIC(8,2) DEFAULT 0.0,
-    layout_trilho_id INT, -- Identifica em qual trilho DIN do painel ele foi alocado
-    PRIMARY KEY (projeto_id, id) -- Chave composta para permitir múltiplos projetos
-);
+    -- DISJUNTORES MOTOR
+    ('ABB', 'MS132-32', 'Disjuntor Motor Magnetotérmico Faixa Ajuste 25-32A', 'Disjuntor Motor', 45.00, 90.00, 86.70, '<svg>...</svg>'),
+    ('Siemens', '3RV2011-4EA10', 'Disjuntor Motor Sirius 3RV2 Proteção Térmica 27-32A', 'Disjuntor Motor', 45.00, 97.00, 97.00, '<svg>...</svg>'),
+    ('WEG', 'MPW32-3-U032', 'Disjuntor Motor Termomagnético Ajuste Comum 25-32A', 'Disjuntor Motor', 45.00, 97.00, 98.00, '<svg>...</svg>'),
+    ('Steck', 'SM3-32', 'Disjuntor Motor Magnetotérmico Ajustável 25-32A', 'Disjuntor Motor', 45.00, 89.00, 78.50, '<svg>...</svg>'),
+    ('Sibratec', 'GV2-ME32', 'Disjuntor Motor Magnético/Térmico Faixa 25-32A', 'Disjuntor Motor', 45.00, 89.00, 78.20, '<svg>...</svg>'),
 
--- 4. A NETLIST / CONEXÕES (Sincronizado com as rotas do AutoCAD e IA)
-CREATE TABLE conexoes_fios (
-    id SERIAL PRIMARY KEY,
-    projeto_id INT NOT NULL,
-    
-    -- Origem da conexão (Refere-se ao id do componente no mesmo projeto)
-    origem_id INT NOT NULL,
-    pino_origem VARCHAR(10),
-    
-    -- Destino da conexão (Refere-se ao id do componente no mesmo projeto)
-    destino_id INT NOT NULL,
-    pino_destino VARCHAR(10),
-    
-    -- Propriedades do Fio/Cabo
-    bitola_mm2 NUMERIC(4,2) DEFAULT 1.5,
-    cor_fio VARCHAR(20) DEFAULT 'Azul',
-    tag_fio VARCHAR(50), -- Identificação da anilha do fio
-    
-    -- Dados para o algoritmo de roteamento desenhar as linhas
-    caminho_geometria_json JSONB, -- Guarda os pontos [x,y] por onde a linha do diagrama deve passar
-    
-    -- Restrição de chave estrangeira composta garantindo integridade com os componentes existentes
-    FOREIGN KEY (projeto_id, origem_id) REFERENCES componentes_projeto(projeto_id, id) ON DELETE CASCADE,
-    FOREIGN KEY (projeto_id, destino_id) REFERENCES componentes_projeto(projeto_id, id) ON DELETE CASCADE
-);
+    -- DISJUNTORES CAIXA MOLDADA
+    ('ABB', 'XT4N-250', 'Disjuntor Caixa Moldada Tmax XT4N Tripolar Fixo 250A', 'Disjuntor Caixa Moldada', 105.00, 160.00, 82.50, '<svg>...</svg>'),
+    ('Siemens', '3VA1110-4EE32-0AA0', 'Disjuntor Caixa Moldada 3VA1 Tripolar 100A TM220', 'Disjuntor Caixa Moldada', 76.20, 130.00, 70.00, '<svg>...</svg>'),
+    ('WEG', 'DWB250N250-3', 'Disjuntor Caixa Moldada Tripolar Térmico Fixo 250A', 'Disjuntor Caixa Moldada', 105.00, 165.00, 89.50, '<svg>...</svg>'),
+    ('Steck', 'SXM1-125F', 'Disjuntor Caixa Moldada Tripolar Térmico Fixo 125A', 'Disjuntor Caixa Moldada', 76.00, 130.00, 68.00, '<svg>...</svg>'),
+    ('Sibratec', 'DAM1-160F', 'Disjuntor Caixa Moldada Fixo Tripolar 160A', 'Disjuntor Caixa Moldada', 76.00, 135.00, 72.00, '<svg>...</svg>'),
+
+    -- CHAVES SECCIONADORAS
+    ('ABB', 'OT160E03P', 'Chave Seccionadora Rotativa Tripolar de Comando Base 160A', 'Chave Seccionadora', 123.00, 130.00, 72.50, '<svg>...</svg>'),
+    ('Siemens', 'S326303', 'Chave Seccionadora Tripolar de Manobra sob Carga 630A S32', 'Chave Seccionadora', 180.00, 240.00, 150.00, '<svg>...</svg>'),
+    ('WEG', 'FSW630-3P', 'Chave Seccionadora Rotativa Tripolar sob Carga 630A', 'Chave Seccionadora', 185.00, 245.00, 160.00, '<svg>...</svg>'),
+    ('Steck', 'SKD1-100', 'Chave Seccionadora Rotativa Compacta de Porta 100A', 'Chave Seccionadora', 64.00, 64.00, 83.50, '<svg>...</svg>'),
+    ('Sibratec', 'JHL-250', 'Chave Seccionadora Rotativa sob Carga Tripolar 250A', 'Chave Seccionadora', 110.00, 135.00, 95.00, '<svg>...</svg>'),
+
+    -- BARRAMENTOS E ACESSÓRIOS DE FORÇA
+    ('Siemens', '5ST3710', 'Barramento de Fase Tipo Pente Trifásico 12 Módulos 80A', 'Barramento de fase tipo pente', 216.00, 15.00, 18.00, '<svg>...</svg>'),
+    ('Brum', 'BEP-250-12', 'Barramento Espinha de Peixe Din Trifásico 12 Derivações 250A', 'Barramento espinha de peixe', 140.00, 320.00, 65.00, '<svg>...</svg>'),
+    ('Brum', 'BTN-07', 'Barramento de Distribuição Isolado Terra/Neutro 7 Furos DIN', 'Barramento terra e neutro', 56.00, 28.00, 32.00, '<svg>...</svg>'),
+    ('WEG', 'BC-15X3-1M', 'Barramento de Cobre Eletrolítico Retangular Maciço 15x3mm 1 Metro', 'Barramento de cobre', 15.00, 1000.00, 3.00, '<svg>...</svg>'),
+
+    -- BORNES DE CONEXÃO DE PAINEL
+    ('WEG', 'BTW2.5', 'Borne Passagem Simples Conexão Parafuso 2.5mm² Cinza', 'Borne simples', 5.10, 42.50, 40.50, '<svg>...</svg>'),
+    ('ABB', 'ZS4-D2', 'Borne Passagem Duplo Estágio Conexão Parafuso 4mm² Cinza', 'Borne duplo', 5.20, 70.00, 65.50, '<svg>...</svg>'),
+
+    -- RELÉS AUTOMAÇÃO E PROTEÇÃO
+    ('WEG', 'RTW17-G01MAT20', 'Relé Temporizador Eletrônico Multifunção Retardo Energização', 'Relé temporizador', 17.50, 90.00, 64.00, '<svg>...</svg>'),
+    ('Sibratec', 'RFF-03', 'Relé Supervisor Falta de Fase sem Neutro 220-440Vca', 'Relé falta de fase', 22.50, 85.00, 61.00, '<svg>...</svg>'),
+    ('Siemens', '3RU2126-4EB0', 'Relé Térmico de Sobrecarga Bimetálico Sirius Ajuste 27-32A', 'Relé térmico de sobrecarga', 45.00, 85.00, 85.00, '<svg>...</svg>'),
+    ('Sibratec', 'SSR-40DA', 'Relé de Estado Sólido Entrada 3-32Vcc Saída 24-380Vca 40A', 'Relé de estado sólido', 45.00, 60.00, 23.00, '<svg>...</svg>');
+
+
+-- ============================================================================
+-- 2. CADASTRO DOS PINOS DE LIGAÇÃO (catalogo_pinos)
+-- ============================================================================
+-- Associação dinâmica de bornes para os algoritmos de Netlist e fiação
+
+-- Bornes de Entrada/Saída Trifásica para os Minidisjuntores (Exemplo Siemens 5SL)
+INSERT INTO catalogo_pinos (catalogo_id, nome_pino, tipo_sinal, posicao_relativa_x, posicao_relativa_y) VALUES
+((SELECT id FROM catalogo_componentes WHERE modelo = '5SL6363-7'), '1', 'Potencia', 0.16, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '5SL6363-7'), '3', 'Potencia', 0.50, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '5SL6363-7'), '5', 'Potencia', 0.83, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '5SL6363-7'), '2', 'Potencia', 0.16, 0.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '5SL6363-7'), '4', 'Potencia', 0.50, 0.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '5SL6363-7'), '6', 'Potencia', 0.83, 0.00);
+
+-- Bornes da Chave Seccionadora Rotativa S32 Siemens (630A)
+INSERT INTO catalogo_pinos (catalogo_id, nome_pino, tipo_sinal, posicao_relativa_x, posicao_relativa_y) VALUES
+((SELECT id FROM catalogo_componentes WHERE modelo = 'S326303'), '1', 'Potencia', 0.20, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = 'S326303'), '3', 'Potencia', 0.50, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = 'S326303'), '5', 'Potencia', 0.80, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = 'S326303'), '2', 'Potencia', 0.20, 0.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = 'S326303'), '4', 'Potencia', 0.50, 0.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = 'S326303'), '6', 'Potencia', 0.80, 0.00);
+
+-- Bornes da Contatora de Potência Sirius Siemens (3RT2027) com Contato de Comando NO e Alimentação A1/A2
+INSERT INTO catalogo_pinos (catalogo_id, nome_pino, tipo_sinal, posicao_relativa_x, posicao_relativa_y) VALUES
+((SELECT id FROM catalogo_componentes WHERE modelo = '3RT2027-1AP00'), '1/L1', 'Potencia', 0.15, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '3RT2027-1AP00'), '3/L2', 'Potencia', 0.35, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '3RT2027-1AP00'), '5/L3', 'Potencia', 0.55, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '3RT2027-1AP00'), '13NO', 'Comando',  0.75, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '3RT2027-1AP00'), 'A1',   'Comando',  0.90, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '3RT2027-1AP00'), '2/T1', 'Potencia', 0.15, 0.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '3RT2027-1AP00'), '4/T2', 'Potencia', 0.35, 0.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '3RT2027-1AP00'), '6/T3', 'Potencia', 0.55, 0.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '3RT2027-1AP00'), '14NO', 'Comando',  0.75, 0.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = '3RT2027-1AP00'), 'A2',   'Comando',  0.90, 0.00);
+
+-- Bornes do Relé Supervisor de Falta de Fase Sibratec (Entradas de Fase + Contato Reversível 15-16-18)
+INSERT INTO catalogo_pinos (catalogo_id, nome_pino, tipo_sinal, posicao_relativa_x, posicao_relativa_y) VALUES
+((SELECT id FROM catalogo_componentes WHERE modelo = 'RFF-03'), 'L1', 'Potencia', 0.20, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = 'RFF-03'), 'L2', 'Potencia', 0.50, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = 'RFF-03'), 'L3', 'Potencia', 0.80, 1.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = 'RFF-03'), '15', 'Comando',  0.20, 0.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = 'RFF-03'), '16', 'Comando',  0.50, 0.00),
+((SELECT id FROM catalogo_componentes WHERE modelo = 'RFF-03'), '18', 'Comando',  0.80, 0.00);
+
+-- Bornes do Borne Duplo de Trilho ABB (ZS4-D2) -> Superior (1-2) e Inferior (3-4)
