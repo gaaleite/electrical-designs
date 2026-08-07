@@ -93,20 +93,36 @@ if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
     st.markdown("Preencha as informações na planilha abaixo e utilize o formulário para gerenciar, sincronizar ou salvar seus dados sem perdas.")
 
-    # DICIONÁRIO DE BACKUP INTELIGENTE COM CÓDIGOS DE CATÁLOGO INDUSTRIAIS VIGENTES
+    # DICIONÁRIOS REINJETADOS NO SCRIPT PYTHON PARA USO NAS BUSCAS EM TEMPO REAL
+    TABELA_PRECOS_PADRAO = {
+        "disjuntor caixa moldada": 5200.00,
+        "chave seccionadora": 1650.00,
+        "disjuntor motor": 280.00,
+        "disjuntor": 120.00,
+        "contatora": 350.00,
+        "barramento de cobre": 450.00,
+        "clp industrial": 2500.00,
+        "relé térmico de sobrecarga": 180.00
+    }
+
     DICIONARIO_CODIGOS_ATUAIS = {
         "chave seccionadora": {
-            "siemens": {"630": "3VA1463-4EE32-0AA0", "600": "3VA1460-4EE32-0AA0", "400": "3VA1340-4EE32-0AA0", "250": "3VA1225-4EE32-0AA0", "100": "3VA1110-4EE32-0AA0"},
-            "weg": {"630": "DWB630N630-3", "400": "DWB400N400-3", "250": "DWB250N250-3"},
+            "siemens": {"630": "S326303", "600": "S326303", "400": "S324003", "250": "S322503", "100": "S321003"},
+            "weg": {"630": "FSW630-3P", "400": "FSW400-3P", "250": "FSW250-3P"},
+            "schneider": {"630": "INS630-LV431548", "400": "INS400-LV431540", "250": "INS250-LV431100"}
+        },
+        "disjuntor caixa moldada": {
+            "siemens": {"630": "3VA1463-4EE32-0AA0", "600": "3VA1460-4EE32-0AA0", "500": "3VA1450-4EE32-0AA0", "400": "3VA1340-4EE32-0AA0", "250": "3VA1225-4EE32-0AA0", "100": "3VA1110-4EE32-0AA0"},
+            "weg": {"630": "DWB630N630-3", "500": "DWB500N500-3", "400": "DWB400N400-3", "250": "DWB250N250-3"},
             "schneider": {"630": "LV432078", "400": "LV432072", "250": "LV431620"}
         },
-        "disjuntor trifasico": {
+        "disjuntor": {
             "siemens": {"100": "3VA1110-4EE32-0AA0", "63": "3VA1163-4EE32-0AA0", "32": "3RV2011-4EA10"},
-            "weg": {"63": "MDW-C63-3", "32": "MDW-C32-3", "16": "MDW-C16-3"}
+            "weg": {"63": "MDW-C63-3", "32": "MDW-C32-3"}
         },
-        "contator de potencia": {
-            "siemens": {"32": "3RT2027-1AP00", "25": "3RT2026-1AP00", "12": "3RT2017-1AP00"},
-            "weg": {"32": "CWM32-00-30V24", "25": "CWM25-00-30V24"}
+        "contatora": {
+            "siemens": {"32": "3RT2027-1AP00", "25": "3RT2026-1AP00"},
+            "weg": {"32": "CWM32-00-30V24"}
         }
     }
 
@@ -115,13 +131,13 @@ if "1." in ambiente:
         marca_limpo = str(marca_item).strip().lower()
         ampere_limpo = str(ampere).strip().upper().replace("A", "")
         
-        preco_padrao = TABELA_PRECOS_PADRAO.get(nome_item, 50.00)
+        preco_padrao = TABELA_PRECOS_PADRAO.get(nome_limpo, 150.00)
         
         if not nome_item or nome_limpo == "":
             return preco_padrao, "Não encontrado"
             
         termo_busca = f"{nome_item} {marca_item} {ampere}".strip()
-        query_completa = f'"{nome_item}" {marca_item} {ampere} código catálogo part number'
+        query_completa = f'"{nome_item}" {marca_item} {ampere} preço comercial comprar'
         url = f"https://duckduckgo.com{urllib.parse.quote(query_completa)}"
         
         try:
@@ -138,34 +154,37 @@ if "1." in ambiente:
                     for v in valores_moeda:
                         v_limpo = v.replace('.', '').replace(',', '.')
                         val_float = float(v_limpo)
-                        if val_float > 10.0:
-                            lista_precos.append(val_float)
+                        if "caixa moldada" in nome_limpo or "seccionadora" in nome_limpo:
+                            if val_float > 400.0:
+                                lista_precos.append(val_float)
+                        else:
+                            if val_float > 10.0:
+                                lista_precos.append(val_float)
                     if lista_precos:
                         preco_padrao = min(lista_precos)
                 
                 codigos_candidatos = []
-                matches_part_number = re.findall(r'\b([A-Z0-9]{3,10}[-_\s][A-Z0-9]{3,10}[-_\s][A-Z0-9]{2,10})\b|\b([A-Z]{2,4}\d{4,15}[A-Z0-9-]{0,10})\b', html_content, re.IGNORECASE)
+                matches_part_number = re.findall(r'\b(3VA\d{4,15}[A-Z0-9-]*)\b|\b(S32\d{3,6})\b|\b(FSW\d{3}[A-Z0-9-]*)\b|\b([A-Z0-9]{4,10}[-_\s][A-Z0-9]{4,10})\b', html_content, re.IGNORECASE)
                 
                 for match in matches_part_number:
                     texto_cod = next((str(m).strip() for m in match if m), "")
-                    termos_invalidos = ["HTML", "QUERY", "HTTP", "WWW", "PREÇO", "PRECO", "CHAVE", "MOTOR", "AMP", "AMPERE"]
+                    termos_invalidos = ["HTML", "QUERY", "HTTP", "WWW", "PREÇO", "PRECO", "AMP", "AMPERE"]
                     if texto_cod and not any(t in texto_cod.upper() for t in termos_invalidos):
-                        if not texto_cod.isdigit() and len(texto_cod) >= 6:
+                        if not texto_cod.isdigit() and len(texto_cod) >= 5:
                             codigos_candidatos.append(texto_cod.upper())
                 
                 if codigos_candidatos:
                     return preco_padrao, max(set(codigos_candidatos), key=codigos_candidatos.count)
-                    
         except Exception:
             pass
             
+        codigo_final = f"{marca_item[:3].upper() if marca_item else 'REF'}-{ampere_limpo}"
         if nome_limpo in DICIONARIO_CODIGOS_ATUAIS:
             if marca_limpo in DICIONARIO_CODIGOS_ATUAIS[nome_limpo]:
                 if ampere_limpo in DICIONARIO_CODIGOS_ATUAIS[nome_limpo][marca_limpo]:
-                    return preco_padrao, DICIONARIO_CODIGOS_ATUAIS[nome_limpo][marca_limpo][ampere_limpo]
+                    codigo_final = DICIONARIO_CODIGOS_ATUAIS[nome_limpo][marca_limpo][ampere_limpo]
         
-        ref_moderna = f"{marca_item[:3].upper() if marca_item else 'REF'}-{ampere_limpo}"
-        return preco_padrao, ref_moderna
+        return preco_padrao, codigo_final
 
     if "componentes" in st.session_state and "Codigo_Web" not in st.session_state["componentes"].columns:
         st.session_state["componentes"]["Codigo_Web"] = "Não Sincronizado"
@@ -269,36 +288,6 @@ if "1." in ambiente:
 
     st.subheader("🛒 Relatório Consolidado para Orçamento Comercial")
     if linhas_relatorio:
-        df_relatorio_final = pd.DataFrame(linhas_relatorio)
-        st.dataframe(
-            df_relatorio_final, 
-            use_container_width=True,
-            hide_index=True
-        )
-
-    # ==========================================
-    # SISTEMA DE SALVAMENTO E BUSCA (HISTÓRICO)
-    # ==========================================
-    st.markdown("---")
-    st.subheader("💾 Gerenciamento e Histórico de Orçamentos")
-    
-    nome_orcamento = st.text_input("Identificação / Nome do Orçamento", placeholder="Ex: Orc_Painel_Cliente_A")
-    if st.button("💾 Salvar Planilha", use_container_width=True):
-        if nome_orcamento.strip() == "":
-            st.warning("Insira um nome válido para salvar.")
-        elif df_editado.empty:
-            st.warning("A planilha atual está vazia.")
-        else:
-            st.session_state["historico_orcamentos"][nome_orcamento] = {
-                "dados_brutos": df_editado.copy(),
-                "relatorio": pd.DataFrame(linhas_relatorio),
-                "total": total_general_painel
-            }
-            st.success(f"Orçamento '{nome_orcamento}' gravado no histórico!")
-            
-            # Limpa a planilha superior deixando as caixas em branco para o próximo orçamento
-            st.session_state["componentes"] = pd.DataFrame([{"id": 1, "Nome": "", "Marca": "", "Ampere": "", "Qtd": 1, "Preco_Unitario": 0.0}])
-            st.rerun()
 
 
 # ==========================================
