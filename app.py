@@ -15,6 +15,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Inicializa o histórico global de orçamentos se não existir
+if "historico_orcamentos" not in st.session_state:
+    st.session_state["historico_orcamentos"] = {}
+
 # Estilização CSS para emular interface Dark de Softwares CAD
 st.markdown("""
     <style>
