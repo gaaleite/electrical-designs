@@ -64,7 +64,9 @@ DICIONARIO_CODIGOS_ATUAIS = {
 # --- INICIALIZAÇÃO DOS ESTADOS DA SESSÃO ---
 if "componentes" not in st.session_state:
     st.session_state["componentes"] = pd.DataFrame([
-        {"id": 1, "Nome": "", "Marca": "", "Ampere": "", "Qtd": 1, "Preco_Unitario": 0.0}
+        {"id": 1, "Nome": "Disjuntor Caixa Moldada", "Marca": "Siemens", "Ampere": "630A", "Qtd": 1, "Preco_Unitario": 5200.00},
+        {"id": 2, "Nome": "Contatora", "Marca": "Siemens", "Ampere": "32A", "Qtd": 2, "Preco_Unitario": 350.00},
+        {"id": 3, "Nome": "Disjuntor Motor", "Marca": "WEG", "Ampere": "32A", "Qtd": 1, "Preco_Unitario": 280.00}
     ])
 
 if "conexoes" not in st.session_state:
@@ -76,7 +78,6 @@ if "conexoes" not in st.session_state:
 if "historico_orcamentos" not in st.session_state:
     st.session_state["historico_orcamentos"] = {}
 
-# Garante a coluna de cache para as rotinas de busca
 if "Codigo_Web" not in st.session_state["componentes"].columns:
     st.session_state["componentes"]["Codigo_Web"] = "Não Sincronizado"
 
@@ -113,16 +114,15 @@ if "1." in ambiente:
         if not nome_item or nome_limpo == "":
             return preco_padrao, "Não encontrado"
             
-        termo_busca = f"{nome_item} {marca_item} {ampere}".strip()
-        query_completa = f'"{nome_item}" {marca_item} {ampere} preço comercial comprar'
-        url = f"https://duckduckgo.com{urllib.parse.quote(query_completa)}"
+        query_completa = f'"{nome_item}" {marca_item} {ampere} preco comprar'
+        url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query_completa)}"
         
         try:
             req = urllib.request.Request(
                 url, 
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'}
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
             )
-            with urllib.request.urlopen(req, timeout=6) as response:
+            with urllib.request.urlopen(req, timeout=4) as response:
                 html_content = response.read().decode('utf-8', errors='ignore')
                 
                 valores_moeda = re.findall(r'R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', html_content)
@@ -214,13 +214,24 @@ if "1." in ambiente:
                 
                 df_atualizado["Codigo_Web"] = codigos_coletados
                 st.session_state["componentes"] = df_atualizado
-                st.success("Preços e códigos comerciais mais comprados atualizados com sucesso!")
+                st.success("Preços e códigos comerciais atualizados com sucesso!")
                 st.rerun()
 
-    total_general_painel = 0.0
-    linhas_relatorio = []
+    # Cálculo do resumo financeiro
+    total_geral_painel = 0.0
+    st.subheader("💰 Resumo Financeiro do Projeto")
+    
+    for idx, row in st.session_state["componentes"].iterrows():
+        qtd = row.get("Qtd", 0)
+        preco = row.get("Preco_Unitario", 0.0)
+        subtotal = qtd * preco
+        total_geral_painel += subtotal
 
-    for idx, row in df_editado.iterrows():
+    col_met1, col_met2 = st.columns(2)
+    with col_met1:
+        st.metric("Total de Componentes Distintos", len(st.session_state["componentes"]))
+    with col_met2:
+        st.metric("Custo Total Estimado (BOM)", f"R$ {total_geral_painel:,.2f}")
 
 
 # ==========================================
@@ -228,39 +239,56 @@ if "1." in ambiente:
 # ==========================================
 if "2." in ambiente:
     st.markdown('<div class="cad-header">📐 Canvas de Roteamento (Visualização CAD)</div>', unsafe_allow_html=True)
-    col_config, col_canvas = st.columns()
+    col_config, col_canvas = st.columns([1, 2])
     
     with col_config:
+        st.subheader("⚡ Conexões dos Fios")
         df_fios = st.data_editor(st.session_state["conexoes"], num_rows="dynamic", use_container_width=True, key="editor_fios")
         st.session_state["conexoes"] = df_fios
         
     with col_canvas:
+        st.subheader("🖥️ Esquemático Unifilar / Trifilar")
         comp_df = st.session_state["componentes"]
         posicoes = {}
-        passo_x = 800 / (len(comp_df) if len(comp_df) > 0 else 1)
+        
+        num_comp = len(comp_df) if len(comp_df) > 0 else 1
+        passo_x = 800 / num_comp
+        
         for i, (_, row) in enumerate(comp_df.iterrows()):
             c_id = row.get("id")
-            if pd.isna(c_id): continue
-            posicoes[int(c_id)] = {"x": 100 + (i * passo_x * 0.8), "y": 250, "nome": str(row.get("Tag/Nome", f"ID {c_id}"))}
+            if pd.isna(c_id): 
+                continue
+            posicoes[int(c_id)] = {
+                "x": 100 + (i * passo_x * 0.8), 
+                "y": 250, 
+                "nome": str(row.get("Nome", f"ID {c_id}"))
+            }
 
         fig, ax = plt.subplots(figsize=(11, 6), facecolor='#151515')
         ax.set_facecolor('#151515')
-        largura_box, altura_box = 80, 110
+        largura_box, altura_box = 100, 80
         
         for c_id, pos in posicoes.items():
             rect = plt.Rectangle((pos["x"] - largura_box/2, pos["y"] - altura_box/2), largura_box, altura_box, facecolor='#2A2A2A', edgecolor='#00FFCC', linewidth=2)
             ax.add_patch(rect)
-            ax.text(pos["x"], pos["y"], pos["nome"], ha='center', va='center', color='white', fontsize=10, fontweight='bold')
+            ax.text(pos["x"], pos["y"], f"ID {c_id}\n{pos['nome']}", ha='center', va='center', color='white', fontsize=8, fontweight='bold')
             
         for _, fio in df_fios.iterrows():
             try:
-                origem = posicoes.get(int(fio["origem_id"]))
-                destino = posicoes.get(int(fio["destino_id"]))
-                if not起源 or not destino: continue
+                origem_id = int(fio["origem_id"]) if pd.notna(fio["origem_id"]) else None
+                destino_id = int(fio["destino_id"]) if pd.notna(fio["destino_id"]) else None
+                
+                origem = posicoes.get(origem_id)
+                destino = posicoes.get(destino_id)
+                
+                if not origem or not destino: 
+                    continue
+                    
                 meio_x = (origem["x"] + destino["x"]) / 2
                 xs = [origem["x"], meio_x, meio_x, destino["x"]]
                 ys = [origem["y"], origem["y"], destino["y"], destino["y"]]
                 cor_plot = mapeamento_cores.get(str(fio.get("cor_fio", "Azul")).strip().lower(), "cyan")
+                
                 ax.plot(xs, ys, color=cor_plot, linewidth=2)
                 ax.annotate('', xy=(destino["x"], destino["y"]), xytext=(meio_x, destino["y"]), arrowprops=dict(arrowstyle="->", color=cor_plot, lw=1.5))
             except Exception:
@@ -270,7 +298,8 @@ if "2." in ambiente:
         ax.set_ylim(0, 500)
         ax.grid(True, color='#252525', linestyle='--', linewidth=0.5)
         ax.invert_yaxis()
-        for spine in ax.spines.values(): spine.set_visible(False)
+        for spine in ax.spines.values(): 
+            spine.set_visible(False)
         st.pyplot(fig)
 
 # ==========================================
