@@ -93,45 +93,46 @@ if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
     st.markdown("Altere o Ampere na planilha abaixo e clique no botão para disparar a busca automática de preços comerciais na internet.")
 
-    def buscar_preco_api_aberta(ampere, nome_item):
-        # Se o usuário não digitou o nome do componente, usa o fallback padrão
+    def buscar_preco_e_codigo_web(ampere, nome_item):
+        preco_padrao = TABELA_PRECOS_PADRAO.get(nome_item, 50.00)
+        codigo_padrao = "Código não encontrado (Preço Padrão)"
+        
         if not nome_item or str(nome_item).strip() == "":
-            return TABELA_PRECOS_PADRAO.get(nome_item, 50.00)
+            return preco_padrao, codigo_padrao
             
-        # Monta a query focada em trazer resultados comerciais de lojas
         query = f"preço comercial {nome_item} {ampere}".strip()
         url = f"https://duckduckgo.com{urllib.parse.quote(query)}"
         
         try:
             req = urllib.request.Request(
                 url, 
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
             )
             with urllib.request.urlopen(req, timeout=7) as response:
                 html_content = response.read().decode('utf-8', errors='ignore')
                 
-                # Captura padrões comuns de preços em páginas web (ex: R$ 150,00 ou R$150.00)
-                valores_encontrados = re.findall(r'R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', html_content)
+                # Encontra blocos de resultados para associar o preço ao título/código da página
+                resultados = re.findall(r'<a class="result__url"[^>]*>([^<]+)</a>.*?R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', html_content, re.DOTALL)
                 
-                if valores_encontrados:
-                    precos_convertidos = []
-                    for v in valores_encontrados:
-                        # Limpa a string removendo pontos de milhar e padronizando o ponto decimal
-                        v_limpo = v.replace('.', '').replace(',', '.')
+                if resultados:
+                    precos_validos = []
+                    for site, valor in resultados:
+                        v_limpo = valor.replace('.', '').replace(',', '.')
                         val_float = float(v_limpo)
-                        
-                        # Filtro de segurança: ignora valores irreais (ex: centavos ou erros de leitura de texto)
                         if val_float > 5.0:
-                            precos_convertidos.append(val_float)
+                            # Limpa o domínio do site para servir como o Código/Referência do fornecedor encontrado
+                            site_limpo = site.strip().replace("www.", "").split('/')[0]
+                            precos_validos.append((val_float, site_limpo))
                     
-                    # Retorna o menor preço (mais em conta) encontrado na listagem da web
-                    if precos_convertidos:
-                        return min(precos_convertidos)
+                    if precos_validos:
+                        # Retorna a tupla com o menor preço encontrado e o respectivo domínio/código do site
+                        menor_registro = min(precos_validos, key=lambda x: x[0])
+                        return menor_registro[0], menor_registro[1]
+                        
         except Exception:
             pass
             
-        # Caso falhe a conexão ou não ache preços no HTML, recorre ao banco padrão pelo nome do item
-        return TABELA_PRECOS_PADRAO.get(nome_item, 50.00)
+        return preco_padrao, codigo_padrao
 
     st.subheader("📋 Lista de Materiais do Painel (BOM)")
     
@@ -145,44 +146,44 @@ if "1." in ambiente:
             "id": st.column_config.NumberColumn("ID", disabled=False),
             "Nome": st.column_config.TextColumn("Nome"),
             "Marca": st.column_config.TextColumn("Marca"),
-            "Ampere": st.column_config.TextColumn(
-                "Ampere",
-                help="Digite a corrente em Ampere do dispositivo"
-            ),
+            "Ampere": st.column_config.TextColumn("Ampere", help="Digite a corrente em Ampere"),
             "Qtd": st.column_config.NumberColumn("Qtd", min_value=0, default=1),
             "Preco_Unitario": st.column_config.NumberColumn("Preço", format="R$ %.2f")
         }
     )
-    # Atualiza o estado da sessão com as edições manuais feitas nas células
     st.session_state["componentes"] = df_editado
+
+    # Inicializa uma coluna oculta para guardar o código raspado da web na sessão se ela não existir
+    if "Codigo_Web" not in st.session_state["componentes"].columns:
+        st.session_state["componentes"]["Codigo_Web"] = "Não Sincronizado"
 
     if st.button("🔍 Sincronizar e Buscar Preços na Web em Tempo Real", type="primary"):
         if df_editado.empty:
             st.warning("Adicione pelo menos uma linha na tabela para buscar preços.")
         else:
-            with st.spinner("Varrendo a web em busca do menor preço comercial..."):
-                # Cria uma cópia para aplicar as alterações e evitar conflitos de renderização imediata
+            with st.spinner("Varrendo a web em busca do menor preço e código comercial..."):
                 df_atualizado = df_editado.copy()
+                codigos_coletados = []
                 
                 for idx, row in df_atualizado.iterrows():
                     ampere_item = str(row.get("Ampere", ""))
                     nome_item = str(row.get("Nome", ""))
                     
-                    # Faz o disparo da busca passando o nome real ("Disjuntor Motor") e o Ampere ("63")
-                    menor_preco = buscar_preco_api_aberta(ampere_item, nome_item)
+                    # Retorna o menor preço e a identificação do local onde foi achado
+                    menor_preco, codigo_fornecedor = buscar_preco_e_codigo_web(ampere_item, nome_item)
                     
-                    # Injeta o valor capturado direto na coluna de Preços da planilha principal
                     df_atualizado.at[idx, "Preco_Unitario"] = menor_preco
+                    codigos_coletados.append(codigo_fornecedor)
                 
-                # Grava de volta no st.session_state para atualizar a tabela na tela
+                df_atualizado["Codigo_Web"] = codigos_coletados
                 st.session_state["componentes"] = df_atualizado
-                st.success("Tabela de preços sincronizada com a web com sucesso!")
+                st.success("Preços e códigos dos produtos sincronizados com sucesso!")
                 st.rerun()
 
     total_general_painel = 0.0
     linhas_relatorio = []
 
-    for _, row in df_editado.iterrows():
+    for idx, row in df_editado.iterrows():
         qtd = pd.to_numeric(row.get("Qtd", 0), errors='coerce')
         if pd.isna(qtd): qtd = 0
         
@@ -195,16 +196,18 @@ if "1." in ambiente:
         id_item = row.get("id", "")
         nome = str(row.get("Nome", "")).strip()
         marca = str(row.get("Marca", "")).strip()
-        ampere = str(row.get("Ampere", "")).strip()
         
-        # Cria a sequência textual para a coluna Componente
+        # Correção 1: Garante a formatação com o "A" caso exista valor de corrente informado
+        ampere = str(row.get("Ampere", "")).strip()
+        if ampere and not ampere.upper().endswith("A"):
+            ampere = f"{ampere}A"
+        
         partes = [p for p in [nome, marca, ampere] if p]
         texto_componente = " - ".join(partes) if partes else "Item"
         
-        # Gera o código do componente exatamente igual ao termo enviado para a busca de preço
-        texto_codigo = f"{nome} {ampere}".strip() if (nome or ampere) else ""
+        # Correção 2: Puxa o código da página do fornecedor que foi coletado pelo Google/DuckDuckGo
+        texto_codigo = row.get("Codigo_Web", "Não Sincronizado") if "Codigo_Web" in df_editado.columns else "Não Sincronizado"
         
-        # Nova estrutura da tabela de relatório ordenado
         linhas_relatorio.append({
             "ID": id_item,
             "Componente": texto_componente,
@@ -224,7 +227,56 @@ if "1." in ambiente:
 
     st.subheader("🛒 Relatório Consolidado para Orçamento Comercial")
     if linhas_relatorio:
-        st.dataframe(pd.DataFrame(linhas_relatorio), use_container_width=True)
+        df_relatorio_final = pd.DataFrame(linhas_relatorio)
+        st.dataframe(df_relatorio_final, use_container_width=True)
+
+    # ==========================================
+    # SISTEMA DE SALVAMENTO E BUSCA (HISTÓRICO)
+    # ==========================================
+    st.markdown("---")
+    st.subheader("💾 Gerenciamento e Histórico de Orçamentos")
+    
+    col_salvar1, col_salvar2 = st.columns([3, 1])
+    with col_salvar1:
+        nome_orcamento = st.text_input("Identificação / Nome do Orçamento", placeholder="Ex: Orc_Painel_Cliente_A")
+    with col_salvar2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("💾 Salvar Planilha", use_container_width=True):
+            if nome_orcamento.strip() == "":
+                st.warning("Insira um nome válido para salvar.")
+            elif df_editado.empty:
+                st.warning("A planilha atual está vazia.")
+            else:
+                # Armazena o estado completo atual da planilha e do relatório gerado
+                st.session_state["historico_orcamentos"][nome_orcamento] = {
+                    "dados_brutos": df_editado.copy(),
+                    "relatorio": pd.DataFrame(linhas_relatorio),
+                    "total": total_general_painel
+                }
+                st.success(f"Orçamento '{nome_orcamento}' gravado no histórico!")
+                
+                # Reseta a planilha original de digitação deixando-a em branco
+                st.session_state["componentes"] = pd.DataFrame([{"id": 1, "Nome": "", "Marca": "", "Ampere": "", "Qtd": 1, "Preco_Unitario": 0.0}])
+                st.rerun()
+
+    st.markdown("### 🔍 Pesquisar Orçamentos Salvos")
+    if st.session_state["historico_orcamentos"]:
+        lista_orcamentos = list(st.session_state["historico_orcamentos"].keys())
+        orcamento_selecionado = st.selectbox("Selecione um orçamento para carregar ou revisar:", ["-- Selecione --"] + lista_orcamentos)
+        
+        if orcamento_selecionado != "-- Selecione --":
+            dados_salvos = st.session_state["historico_orcamentos"][orcamento_selecionado]
+            
+            st.write(f"**Valor de Fechamento:** R$ {dados_salvos['total']:,.2f}")
+            st.dataframe(dados_salvos["relatorio"], use_container_width=True)
+            
+            if st.button("🔄 Recuperar e Editar Orçamento Selecionado"):
+                st.session_state["componentes"] = dados_salvos["dados_brutos"].copy()
+                st.success(f"Dados do orçamento '{orcamento_selecionado}' carregados de volta na planilha superior!")
+                st.rerun()
+    else:
+        st.info("Nenhum orçamento salvo neste histórico até o momento.")
+
 
 
 # ==========================================
