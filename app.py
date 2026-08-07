@@ -146,7 +146,10 @@ if "1." in ambiente:
     for _, row in df_editado.iterrows():
         qtd = pd.to_numeric(row.get("Qtd", 0), errors='coerce')
         if pd.isna(qtd): qtd = 0
-        p_unit = float(row.get("Preco_Unitario", 0.0))
+        
+        # Correção do Erro: Trata valores None, vazios ou strings inválidas convertendo com segurança para 0.0
+        p_unit = pd.to_numeric(row.get("Preco_Unitario", 0.0), errors='coerce')
+        if pd.isna(p_unit): p_unit = 0.0
         
         subtotal = p_unit * qtd
         total_general_painel += subtotal
@@ -159,6 +162,7 @@ if "1." in ambiente:
             "Preço Unitário": f"R$ {p_unit:,.2f}",
             "Subtotal Comercial": f"R$ {subtotal:,.2f}"
         })
+
 
     st.markdown("---")
     col1, col2 = st.columns(2)
