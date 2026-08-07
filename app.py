@@ -289,6 +289,16 @@ if "1." in ambiente:
         elif df_editado.empty:
             st.warning("A planilha atual está vazia.")
         else:
+            st.session_state["historico_orcamentos"][nome_orcamento] = {
+                "dados_brutos": df_editado.copy(),
+                "relatorio": pd.DataFrame(linhas_relatorio),
+                "total": total_general_painel
+            }
+            st.success(f"Orçamento '{nome_orcamento}' gravado no histórico!")
+            
+            # Limpa a planilha superior deixando as caixas em branco para o próximo orçamento
+            st.session_state["componentes"] = pd.DataFrame([{"id": 1, "Nome": "", "Marca": "", "Ampere": "", "Qtd": 1, "Preco_Unitario": 0.0}])
+            st.rerun()
 
 
 # ==========================================
