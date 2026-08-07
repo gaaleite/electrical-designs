@@ -93,7 +93,7 @@ if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
     st.markdown("Preencha as informações na planilha abaixo e utilize o formulário para gerenciar, sincronizar ou salvar seus dados sem perdas.")
 
-    # Dicionários nativos em Python para respostas rápidas de preço e códigos vigentes
+    # DICIONÁRIOS REINJETADOS NO SCRIPT PYTHON PARA USO NAS BUSCAS EM TEMPO REAL
     TABELA_PRECOS_PADRAO = {
         "disjuntor caixa moldada": 5200.00,
         "chave seccionadora": 1650.00,
@@ -132,6 +132,7 @@ if "1." in ambiente:
         ampere_limpo = str(ampere).strip().upper().replace("A", "")
         
         preco_padrao = TABELA_PRECOS_PADRAO.get(nome_limpo, 150.00)
+        
         if not nome_item or nome_limpo == "":
             return preco_padrao, "Não encontrado"
             
