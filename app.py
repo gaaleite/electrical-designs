@@ -41,8 +41,16 @@ TABELA_PRECOS_PADRAO = {
 # --- INICIALIZAÇÃO DOS ESTADOS DA SESSÃO ---
 if "componentes" not in st.session_state:
     st.session_state["componentes"] = pd.DataFrame([
-        {"id": 1, "Nome": " ", "Marca": " ", "Ampere": " ", "Qtd": " ", "Preco Unitario": " "}
+        {
+            "id": 1, 
+            "Nome": "", 
+            "Marca": "", 
+            "Ampere": "", 
+            "Qtd": 1, 
+            "Preco_Unitario": 0.0
+        }
     ])
+
 
 if "conexoes" not in st.session_state:
     st.session_state["conexoes"] = pd.DataFrame([
@@ -116,15 +124,22 @@ if "1." in ambiente:
         num_rows="dynamic", 
         use_container_width=True,
         key="editor_web_orcamento",
+        # Define a ordem exata das colunas exibidas na tela
+        column_order=["id", "Nome", "Marca", "Ampere", "Qtd", "Preco_Unitario"],
         column_config={
-            "Marca": None,
-            "Modelo": st.column_config.TextColumn(
+            "id": st.column_config.NumberColumn("ID", disabled=False),
+            "Nome": st.column_config.TextColumn("Nome"),
+            "Marca": st.column_config.TextColumn("Marca"),
+            "Ampere": st.column_config.TextColumn(
                 "Ampere",
                 help="Digite a corrente em Ampere do dispositivo"
-            )
+            ),
+            "Qtd": st.column_config.NumberColumn("Qtd", min_value=0, default=1),
+            "Preco_Unitario": st.column_config.NumberColumn("Preço", format="R$ %.2f")
         }
     )
     st.session_state["componentes"] = df_editado
+
 
     if st.button("🔍 Sincronizar e Buscar Preços na Web em Tempo Real", type="primary"):
         with st.spinner("Conectando aos servidores de mercado e atualizando cotações..."):
