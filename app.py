@@ -93,7 +93,7 @@ if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
     st.markdown("Preencha as informações na planilha abaixo e utilize o formulário para gerenciar, sincronizar ou salvar seus dados sem perdas.")
 
-    # DICIONÁRIO DE BACKUP INTELIGENTE COM CÓDIGOS DE CATÁLOGO INDUSTRIAIS ATUAIS
+    # DICIONÁRIO DE BACKUP INTELIGENTE COM CÓDIGOS DE CATÁLOGO INDUSTRIAIS VIGENTES
     DICIONARIO_CODIGOS_ATUAIS = {
         "chave seccionadora": {
             "siemens": {"630": "3VA1463-4EE32-0AA0", "600": "3VA1460-4EE32-0AA0", "400": "3VA1340-4EE32-0AA0", "250": "3VA1225-4EE32-0AA0", "100": "3VA1110-4EE32-0AA0"},
