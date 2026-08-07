@@ -223,6 +223,7 @@ if "1." in ambiente:
     for idx, row in df_editado.iterrows():
 
 
+
 # ==========================================
 # AMBIENTE 2: DIAGRAMA E LAYOUT (AUTOCAD)
 # ==========================================
