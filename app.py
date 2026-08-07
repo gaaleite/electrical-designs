@@ -120,7 +120,6 @@ if "1." in ambiente:
                         v_limpo = valor.replace('.', '').replace(',', '.')
                         val_float = float(v_limpo)
                         if val_float > 5.0:
-                            # Corrige o tratamento de strings e extrai o domínio limpo do link
                             link_str = str(link)
                             if "http" in link_str:
                                 dominio = link_str.split('//')[-1].split('/')[0].replace('www.', '')
@@ -129,6 +128,7 @@ if "1." in ambiente:
                             precos_validos.append((val_float, dominio))
                     
                     if precos_validos:
+                        # Retorna o par que contém o menor preço comercial encontrado
                         menor_registro = min(precos_validos, key=lambda x: x[0])
                         return menor_registro[0], menor_registro[1]
                         
@@ -139,14 +139,14 @@ if "1." in ambiente:
 
     st.subheader("📋 Lista de Materiais do Painel (BOM)")
     
+    # SOLUÇÃO DO BUG: O editor lê diretamente e salva as alterações na chave do session_state via parâmetro 'key'
     df_editado = st.data_editor(
         st.session_state["componentes"], 
         num_rows="dynamic", 
         use_container_width=True,
-        key="editor_web_orcamento",
+        key="componentes_editor_key",
         column_order=["id", "Nome", "Marca", "Ampere", "Qtd", "Preco_Unitario"],
         column_config={
-            # Ajuste de tamanho: Define uma largura pequena e fixa (width="small") para impedir que a célula de ID estique
             "id": st.column_config.NumberColumn("ID", disabled=False, width="small"),
             "Nome": st.column_config.TextColumn("Nome"),
             "Marca": st.column_config.TextColumn("Marca"),
@@ -156,6 +156,7 @@ if "1." in ambiente:
         },
         hide_index=True
     )
+    # Vincula o DataFrame final de forma segura para os cálculos abaixo
     st.session_state["componentes"] = df_editado
 
     if "Codigo_Web" not in st.session_state["componentes"].columns:
@@ -241,7 +242,6 @@ if "1." in ambiente:
     st.markdown("---")
     st.subheader("💾 Gerenciamento e Histórico de Orçamentos")
     
-    # Correção do Erro: Adicionado o argumento obrigatório 2 para gerar duas colunas válidas
     col_salvar1, col_salvar2 = st.columns(2)
     with col_salvar1:
         nome_orcamento = st.text_input("Identificação / Nome do Orçamento", placeholder="Ex: Orc_Painel_Cliente_A")
@@ -279,6 +279,7 @@ if "1." in ambiente:
                 st.rerun()
     else:
         st.info("Nenhum orçamento salvo neste histórico até o momento.")
+
 
 
 # ==========================================
