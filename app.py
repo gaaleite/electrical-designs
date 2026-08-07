@@ -290,6 +290,7 @@ if "1." in ambiente:
     if linhas_relatorio:
 
 
+
 # ==========================================
 # AMBIENTE 2: DIAGRAMA E LAYOUT (AUTOCAD)
 # ==========================================
