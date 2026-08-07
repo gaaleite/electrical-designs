@@ -89,35 +89,45 @@ if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
     st.markdown("Altere o Ampere na planilha abaixo e clique no botão para disparar a busca automática de preços comerciais na internet.")
 
-    def buscar_preco_api_aberta(ampere, tipo):
-        if not ampere:
-            return TABELA_PRECOS_PADRAO.get(tipo, 50.00)
+    def buscar_preco_api_aberta(ampere, nome_item):
+        # Se o usuário não digitou o nome do componente, usa o fallback padrão
+        if not nome_item or str(nome_item).strip() == "":
+            return TABELA_PRECOS_PADRAO.get(nome_item, 50.00)
             
-        query = f"preço comercial {tipo} {ampere}"
-        url = f"https://duckduckgo.com{urllib.parse.quote(query)}&format=json&no_html=1&skip_disambig=1"
+        # Monta a query focada em trazer resultados comerciais de lojas
+        query = f"preço comercial {nome_item} {ampere}".strip()
+        url = f"https://duckduckgo.com{urllib.parse.quote(query)}"
         
         try:
             req = urllib.request.Request(
                 url, 
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
             )
-            with urllib.request.urlopen(req, timeout=5) as response:
-                dados_json = json.loads(response.read().decode('utf-8'))
-                texto_analise = dados_json.get("AbstractText", "") + " " + str(dados_json.get("RelatedTopics", ""))
-                valores = re.findall(r'R\$\s?(\d+[\.,]\d{2})', texto_analise)
+            with urllib.request.urlopen(req, timeout=7) as response:
+                html_content = response.read().decode('utf-8', errors='ignore')
                 
-                if valores:
+                # Captura padrões comuns de preços em páginas web (ex: R$ 150,00 ou R$150.00)
+                valores_encontrados = re.findall(r'R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', html_content)
+                
+                if valores_encontrados:
                     precos_convertidos = []
-                    for v in valores:
+                    for v in valores_encontrados:
+                        # Limpa a string removendo pontos de milhar e padronizando o ponto decimal
                         v_limpo = v.replace('.', '').replace(',', '.')
-                        precos_convertidos.append(float(v_limpo))
-                    return min(precos_convertidos)
+                        val_float = float(v_limpo)
+                        
+                        # Filtro de segurança: ignora valores irreais (ex: centavos ou erros de leitura de texto)
+                        if val_float > 5.0:
+                            precos_convertidos.append(val_float)
+                    
+                    # Retorna o menor preço (mais em conta) encontrado na listagem da web
+                    if precos_convertidos:
+                        return min(precos_convertidos)
         except Exception:
             pass
             
-        # Correção do Erro: Alterado de TABELA_PRECOS_PADERÃO para TABELA_PRECOS_PADRAO
-        return TABELA_PRECOS_PADRAO.get(tipo, 50.00)
-
+        # Caso falhe a conexão ou não ache preços no HTML, recorre ao banco padrão pelo nome do item
+        return TABELA_PRECOS_PADRAO.get(nome_item, 50.00)
 
     st.subheader("📋 Lista de Materiais do Painel (BOM)")
     
@@ -139,20 +149,31 @@ if "1." in ambiente:
             "Preco_Unitario": st.column_config.NumberColumn("Preço", format="R$ %.2f")
         }
     )
+    # Atualiza o estado da sessão com as edições manuais feitas nas células
     st.session_state["componentes"] = df_editado
 
     if st.button("🔍 Sincronizar e Buscar Preços na Web em Tempo Real", type="primary"):
-        with st.spinner("Conectando aos servidores de mercado e atualizando cotações..."):
-            for idx, row in df_editado.iterrows():
-                ampere_item = str(row.get("Ampere", ""))
-                nome_item = str(row.get("Nome", ""))
+        if df_editado.empty:
+            st.warning("Adicione pelo menos uma linha na tabela para buscar preços.")
+        else:
+            with st.spinner("Varrendo a web em busca do menor preço comercial..."):
+                # Cria uma cópia para aplicar as alterações e evitar conflitos de renderização imediata
+                df_atualizado = df_editado.copy()
                 
-                novo_preco = buscar_preco_api_aberta(ampere_item, nome_item)
-                df_editado.at[idx, "Preco_Unitario"] = novo_preco
-            
-            st.session_state["componentes"] = df_editado
-            st.success("Tabela de preços sincronizada com a web com sucesso!")
-            st.rerun()
+                for idx, row in df_atualizado.iterrows():
+                    ampere_item = str(row.get("Ampere", ""))
+                    nome_item = str(row.get("Nome", ""))
+                    
+                    # Faz o disparo da busca passando o nome real ("Disjuntor Motor") e o Ampere ("63")
+                    menor_preco = buscar_preco_api_aberta(ampere_item, nome_item)
+                    
+                    # Injeta o valor capturado direto na coluna de Preços da planilha principal
+                    df_atualizado.at[idx, "Preco_Unitario"] = menor_preco
+                
+                # Grava de volta no st.session_state para atualizar a tabela na tela
+                st.session_state["componentes"] = df_atualizado
+                st.success("Tabela de preços sincronizada com a web com sucesso!")
+                st.rerun()
 
     total_general_painel = 0.0
     linhas_relatorio = []
@@ -167,23 +188,19 @@ if "1." in ambiente:
         subtotal = p_unit * qtd
         total_general_painel += subtotal
         
-        # Coleta os textos tratando valores vazios ou nulos de forma limpa
         nome = str(row.get("Nome", "")).strip()
         marca = str(row.get("Marca", "")).strip()
         ampere = str(row.get("Ampere", "")).strip()
         
-        # Cria a sequência textual apenas com as informações preenchidas pelo usuário
         partes = [p for p in [nome, marca, ampere] if p]
         texto_componente = " - ".join(partes) if partes else "Item"
         
-        # Monta a estrutura sem a coluna 'Dispositivo'
         linhas_relatorio.append({
             "Componente": texto_componente,
             "Quantidade": int(qtd),
             "Preço Unitário": f"R$ {p_unit:,.2f}",
             "Subtotal Comercial": f"R$ {subtotal:,.2f}"
         })
-
 
     st.markdown("---")
     col1, col2 = st.columns(2)
@@ -196,6 +213,7 @@ if "1." in ambiente:
     st.subheader("🛒 Relatório Consolidado para Orçamento Comercial")
     if linhas_relatorio:
         st.dataframe(pd.DataFrame(linhas_relatorio), use_container_width=True)
+
 
 
 
