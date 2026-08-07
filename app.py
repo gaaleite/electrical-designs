@@ -93,14 +93,13 @@ if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
     st.markdown("Altere o Ampere na planilha abaixo e clique no botão para disparar a busca automática de preços comerciais na internet.")
 
-        def buscar_preco_e_codigo_web(ampere, nome_item, marca_item=""):
+    def buscar_preco_e_codigo_web(ampere, nome_item, marca_item=""):
         preco_padrao = TABELA_PRECOS_PADRAO.get(nome_item, 50.00)
         codigo_padrao = "Não encontrado"
         
         if not nome_item or str(nome_item).strip() == "":
             return preco_padrao, codigo_padrao
             
-        # Monta uma busca comercial rica combinando o componente, marca e amperagem
         termo_busca = f"{nome_item} {marca_item} {ampere}".strip()
         query = f"preço comercial {termo_busca}"
         url = f"https://duckduckgo.com{urllib.parse.quote(query)}"
@@ -113,7 +112,7 @@ if "1." in ambiente:
             with urllib.request.urlopen(req, timeout=7) as response:
                 html_content = response.read().decode('utf-8', errors='ignore')
                 
-                # 1. Tenta extrair valores monetários
+                # 1. Busca por valores monetários na página
                 valores_encontrados = re.findall(r'R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', html_content)
                 preco_final = preco_padrao
                 if valores_encontrados:
@@ -126,19 +125,16 @@ if "1." in ambiente:
                     if precos_validos:
                         preco_final = min(precos_validos)
                 
-                # 2. Busca ativa pelo "Código do produto" no texto da página indexada
-                # Padrão 1: Procura explicitamente pela palavra Código/Ref seguida de números/letras (ex: Código: A7B93000)
-                padrao_codigo_direto = re.search(r'(?:C&oacute;digo|Codigo|Ref|Refer&ecirc;ncia|Referencia)[:\s]+([A-Z0-9\-_]{6,20})', html_content, re.IGNORECASE)
-                
-                # Padrão 2: Fallback para capturar códigos de fabricantes elétricos (partes com letras e números misturados longos)
-                padrao_codigo_fabricante = re.search(r'\b([A-Z]{1,3}\d{[A-Z0-9\-_]{5,15})\b', html_content)
+                # 2. Busca ativa por padrões de códigos comerciais e part numbers
+                padrao_codigo_direto = re.search(r'(?:C&oacute;digo|Codigo|Ref|Refer&ecirc;ncia|Referencia)[:\s]+([A-Z0-9\-_]{6,25})', html_content, re.IGNORECASE)
+                padrao_codigo_fabricante = re.search(r'\b([A-Z]{1,3}\d{[A-Z0-9\-_]{5,20})\b', html_content, re.IGNORECASE)
                 
                 if padrao_codigo_direto:
                     codigo_final = padrao_codigo_direto.group(1).strip()
                 elif padrao_codigo_fabricante:
                     codigo_final = padrao_codigo_fabricante.group(1).strip()
                 else:
-                    # Se não achar um código específico de fabricante, extrai o domínio do site vendedor como referência
+                    # Fallback estratégico: extrai o domínio da loja virtual que forneceu a cotação
                     sites_encontrados = re.findall(r'href="([^"]+)"', html_content)
                     dominios_filtrados = []
                     for s in sites_encontrados:
@@ -155,9 +151,8 @@ if "1." in ambiente:
         return preco_padrao, codigo_padrao
 
     st.subheader("📋 Lista de Materiais do Painel (BOM)")
-
     
-    # SOLUÇÃO DO BUG: O editor lê diretamente e salva as alterações na chave do session_state via parâmetro 'key'
+    # Caixa de edição do ID configurada com tamanho estável ("small") e sem perder dados digitados
     df_editado = st.data_editor(
         st.session_state["componentes"], 
         num_rows="dynamic", 
@@ -174,13 +169,12 @@ if "1." in ambiente:
         },
         hide_index=True
     )
-    # Vincula o DataFrame final de forma segura para os cálculos abaixo
     st.session_state["componentes"] = df_editado
 
     if "Codigo_Web" not in st.session_state["componentes"].columns:
         st.session_state["componentes"]["Codigo_Web"] = "Não Sincronizado"
 
-        if st.button("🔍 Sincronizar e Buscar Preços na Web em Tempo Real", type="primary"):
+    if st.button("🔍 Sincronizar e Buscar Preços na Web em Tempo Real", type="primary"):
         if df_editado.empty:
             st.warning("Adicione pelo menos uma linha na tabela para buscar preços.")
         else:
@@ -191,9 +185,8 @@ if "1." in ambiente:
                 for idx, row in df_atualizado.iterrows():
                     ampere_item = str(row.get("Ampere", ""))
                     nome_item = str(row.get("Nome", ""))
-                    marca_item = str(row.get("Marca", ""))  # Coleta a marca digitada na tabela para refinar o robô
+                    marca_item = str(row.get("Marca", ""))
                     
-                    # Nova chamada passando o terceiro parâmetro opcional de marca
                     menor_preco, codigo_fornecedor = buscar_preco_e_codigo_web(ampere_item, nome_item, marca_item)
                     
                     df_atualizado.at[idx, "Preco_Unitario"] = menor_preco
@@ -221,6 +214,7 @@ if "1." in ambiente:
         nome = str(row.get("Nome", "")).strip()
         marca = str(row.get("Marca", "")).strip()
         
+        # Concatena o sufixo "A" no fim do Ampere apenas na exibição do Componente
         ampere = str(row.get("Ampere", "")).strip()
         if ampere and not ampere.upper().endswith("A"):
             ampere = f"{ampere}A"
@@ -293,13 +287,6 @@ if "1." in ambiente:
             st.write(f"**Valor de Fechamento:** R$ {dados_salvos['total']:,.2f}")
             st.dataframe(dados_salvos["relatorio"], use_container_width=True, hide_index=True)
             
-            if st.button("🔄 Recuperar e Editar Orçamento Selecionado"):
-                st.session_state["componentes"] = dados_salvos["dados_brutos"].copy()
-                st.success(f"Dados do orçamento '{orcamento_selecionado}' carregados de volta na planilha superior!")
-                st.rerun()
-    else:
-        st.info("Nenhum orçamento salvo neste histórico até o momento.")
-
 
 
 # ==========================================
