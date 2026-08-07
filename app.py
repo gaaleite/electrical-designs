@@ -290,6 +290,7 @@ if "1." in ambiente:
             st.warning("A planilha atual está vazia.")
         else:
 
+
 # ==========================================
 # AMBIENTE 2: DIAGRAMA E LAYOUT (AUTOCAD)
 # ==========================================
