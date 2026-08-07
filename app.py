@@ -14,7 +14,7 @@ from xml.dom import minidom
 # 1. CONFIGURAÇÃO DA PÁGINA PROFISSIONAL
 # ==========================================
 st.set_page_config(
-    page_title="CAD/IA - Painéis Elétricos Industriais", 
+    page_title="Deigners Elétricos", 
     page_icon="⚡", 
     layout="wide",
     initial_sidebar_state="expanded"
@@ -28,7 +28,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ CAD & Roteador Industrial Inteligente")
+st.title("⚡ Planilhas e Diagramas Elétricos Industriais")
 
 # --- BANCO DE PREÇOS AUXILIAR (FALLBACK DE SEGURANÇA) ---
 TABELA_PRECOS_PADRAO = {
@@ -101,9 +101,9 @@ st.sidebar.header("🕹️ Centro de Operações")
 ambiente = st.sidebar.radio(
     "Mudar ambiente de trabalho:",
     [
-        "📊 1. Dimensionamento e Orçamento",
-        "📐 2. Diagrama e Layout (Estilo AutoCAD)",
-        "🤖 3. Assistente de IA Cooperativo (RAG/Upload)"
+        "📊 1. Orçamento",
+        "📐 2. Diagrama e Layout",
+        "🤖 3. Assistente de IA Cooperativo"
     ]
 )
 
@@ -113,7 +113,7 @@ mapeamento_cores = {
 }
 
 # ==========================================
-# AMBIENTE 1: DIMENSIONAMENTO E ORÇAMENTO
+# AMBIENTE 1: ORÇAMENTO
 # ==========================================
 if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
@@ -277,7 +277,7 @@ if "1." in ambiente:
             st.info("Insira dados na tabela para habilitar o download em XML.")
 
 # ==========================================
-# AMBIENTE 2: DIAGRAMA E LAYOUT (AUTOCAD)
+# AMBIENTE 2: DIAGRAMA E LAYOUT
 # ==========================================
 if "2." in ambiente:
     st.markdown('<div class="cad-header">📐 Canvas de Roteamento (Visualização CAD)</div>', unsafe_allow_html=True)
