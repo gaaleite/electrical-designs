@@ -3,6 +3,6 @@
 dialect = "postgresql"
 host = "localhost"           # Ou o IP do seu servidor de banco de dados
 port = 5432
-database = "seu_banco_de_dados"
+database = "bd"
 username = "seu_usuario"
 password = "sua_senha"
