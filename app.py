@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 import json
 import urllib.request
 import urllib.parse
@@ -71,14 +72,14 @@ def converter_df_para_xml(df: pd.DataFrame, root_element: str = "ListaDeMateriai
         item = ET.SubElement(root, item_element)
         for col in df.columns:
             child = ET.SubElement(item, str(col).replace(" ", "_"))
-            val = str(row[col]) if pd.notna(row[col]) else ""
+            val = str(row[col]) if pd.notna(row[col]) and row[col] is not None else ""
             child.text = val
     
     xml_bruto = ET.tostring(root, encoding="utf-8")
     xml_formatado = minidom.parseString(xml_bruto).toprettyxml(indent="  ")
     return xml_formatado
 
-# --- INICIALIZAÇÃO DOS ESTADOS DA SESSÃO (AGORA INICIAM LIMPOS) ---
+# --- INICIALIZAÇÃO DOS ESTADOS DA SESSÃO ---
 if "componentes" not in st.session_state:
     st.session_state["componentes"] = pd.DataFrame(
         columns=["id", "Nome", "Marca", "Ampere", "Qtd", "Preco_Unitario", "Codigo_Web"]
@@ -92,7 +93,6 @@ if "conexoes" not in st.session_state:
 if "historico_orcamentos" not in st.session_state:
     st.session_state["historico_orcamentos"] = {}
 
-# Garante a coluna de cache para as rotinas de busca
 if "Codigo_Web" not in st.session_state["componentes"].columns:
     st.session_state["componentes"]["Codigo_Web"] = ""
 
@@ -117,7 +117,7 @@ mapeamento_cores = {
 # ==========================================
 if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
-    st.markdown("Preencha as informações na planilha abaixo. A tabela inicia vazia para que você insira os dados do seu projeto.")
+    st.markdown("Preencha as informações na planilha abaixo e utilize os botões para confirmar ou sincronizar os preços.")
 
     def buscar_preco_e_codigo_web(ampere, nome_item, marca_item=""):
         nome_limpo = str(nome_item).strip().lower()
@@ -126,8 +126,8 @@ if "1." in ambiente:
         
         preco_padrao = TABELA_PRECOS_PADRAO.get(nome_limpo, 150.00)
         
-        if not nome_item or nome_limpo == "":
-            return preco_padrao, "Não encontrado"
+        if not nome_item or nome_limpo == "" or nome_limpo == "none":
+            return 0.0, "Não encontrado"
             
         query_completa = f'"{nome_item}" {marca_item} {ampere} preco comprar'
         url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query_completa)}"
@@ -193,7 +193,7 @@ if "1." in ambiente:
                 "Marca": st.column_config.TextColumn("Marca"),
                 "Ampere": st.column_config.TextColumn("Ampere"),
                 "Qtd": st.column_config.NumberColumn("Qtd", min_value=0, default=1),
-                "Preco_Unitario": st.column_config.NumberColumn("Preço Unitário", format="R$ %.2f"),
+                "Preco_Unitario": st.column_config.NumberColumn("Preço Unitário", format="R$ %.2f", default=0.0),
                 "Codigo_Web": st.column_config.TextColumn("Código Fornecedor / Web")
             },
             hide_index=True
@@ -214,7 +214,7 @@ if "1." in ambiente:
         if df_editado.empty or df_editado.dropna(how="all").empty:
             st.warning("Adicione pelo menos um item na tabela para buscar preços.")
         else:
-            with st.spinner("Conectando aos servidores de mercado e buscando códigos comerciais..."):
+            with st.spinner("Conectando aos servidores de mercado e buscando preços/códigos comerciais..."):
                 df_atualizado = df_editado.copy()
                 codigos_coletados = []
                 
@@ -222,39 +222,40 @@ if "1." in ambiente:
                     ampere_item = str(row.get("Ampere", ""))
                     nome_item = str(row.get("Nome", ""))
                     marca_item = str(row.get("Marca", ""))
+                    preco_atual = row.get("Preco_Unitario")
                     
-                    if not nome_item or str(nome_item).strip() == "":
+                    if not nome_item or str(nome_item).strip() == "" or str(nome_item).strip().lower() == "none":
                         codigos_coletados.append("")
                         continue
 
                     menor_preco, codigo_fornecedor = buscar_preco_e_codigo_web(ampere_item, nome_item, marca_item)
                     
-                    # Atualiza apenas se o preço unitário for 0 ou se desejar forçar o valor da busca
-                    if row.get("Preco_Unitario", 0) == 0:
-                        df_atualizado.at[idx, "Preco_Unitario"] = menor_preco
+                    # Atualiza o preço unitário sempre que estiver None, NaN ou 0.0
+                    if pd.isna(preco_atual) or preco_atual is None or float(preco_atual or 0) == 0.0:
+                        df_atualizado.at[idx, "Preco_Unitario"] = float(menor_preco)
                         
                     codigos_coletados.append(codigo_fornecedor)
                 
                 df_atualizado["Codigo_Web"] = codigos_coletados
                 st.session_state["componentes"] = df_atualizado
-                st.success("Preços e códigos comerciais sincronizados!")
+                st.success("Preços e códigos comerciais atualizados com sucesso!")
                 st.rerun()
 
-    # --- SESSÃO DE DOWNLOAD EM XML E RESUMO FINANCIAL ---
+    # --- RESUMO FINANCEIRO E DOWNLOAD XML ---
     st.markdown("---")
     col_fin1, col_fin2, col_export = st.columns([1, 1, 1])
 
     total_geral_painel = 0.0
     for idx, row in st.session_state["componentes"].iterrows():
         try:
-            qtd = float(row.get("Qtd", 0))
-            preco = float(row.get("Preco_Unitario", 0.0))
+            qtd = float(row.get("Qtd") or 0)
+            preco = float(row.get("Preco_Unitario") or 0.0)
             total_geral_painel += (qtd * preco)
         except (ValueError, TypeError):
             pass
 
     with col_fin1:
-        st.metric("Total de Componentes", len(st.session_state["componentes"]))
+        st.metric("Total de Componentes", len(st.session_state["componentes"].dropna(subset=["Nome"])))
     with col_fin2:
         st.metric("Custo Total Estimado (BOM)", f"R$ {total_geral_painel:,.2f}")
     
