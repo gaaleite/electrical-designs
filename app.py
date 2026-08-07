@@ -93,7 +93,7 @@ if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
     st.markdown("Preencha as informações na planilha abaixo e utilize o formulário para gerenciar, sincronizar ou salvar seus dados sem perdas.")
 
-    # DICIONÁRIOS REINJETADOS NO SCRIPT PYTHON PARA USO NAS BUSCAS EM TEMPO REAL
+    # Dicionários nativos em Python para respostas rápidas de preço e códigos vigentes
     TABELA_PRECOS_PADRAO = {
         "disjuntor caixa moldada": 5200.00,
         "chave seccionadora": 1650.00,
@@ -109,7 +109,7 @@ if "1." in ambiente:
         "chave seccionadora": {
             "siemens": {"630": "S326303", "600": "S326303", "400": "S324003", "250": "S322503", "100": "S321003"},
             "weg": {"630": "FSW630-3P", "400": "FSW400-3P", "250": "FSW250-3P"},
-            "schneider": {"630": "INS630-LV431548", "400": "INS400-LV431540", "250": "INS250-LV431100"}
+            "schneider": {"630": "INS630-LV431548", "400": "INS400-LV431540", "250": "INS431100"}
         },
         "disjuntor caixa moldada": {
             "siemens": {"630": "3VA1463-4EE32-0AA0", "600": "3VA1460-4EE32-0AA0", "500": "3VA1450-4EE32-0AA0", "400": "3VA1340-4EE32-0AA0", "250": "3VA1225-4EE32-0AA0", "100": "3VA1110-4EE32-0AA0"},
@@ -132,7 +132,6 @@ if "1." in ambiente:
         ampere_limpo = str(ampere).strip().upper().replace("A", "")
         
         preco_padrao = TABELA_PRECOS_PADRAO.get(nome_limpo, 150.00)
-        
         if not nome_item or nome_limpo == "":
             return preco_padrao, "Não encontrado"
             
@@ -288,7 +287,6 @@ if "1." in ambiente:
 
     st.subheader("🛒 Relatório Consolidado para Orçamento Comercial")
     if linhas_relatorio:
-
 
 
 # ==========================================
