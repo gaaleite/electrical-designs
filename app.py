@@ -165,13 +165,23 @@ if "1." in ambiente:
         subtotal = p_unit * qtd
         total_general_painel += subtotal
         
+        # Coleta os textos tratando valores vazios ou nulos de forma limpa
+        nome = str(row.get("Nome", "")).strip()
+        marca = str(row.get("Marca", "")).strip()
+        ampere = str(row.get("Ampere", "")).strip()
+        
+        # Cria a sequência textual apenas com as informações preenchidas pelo usuário
+        partes = [p for p in [nome, marca, ampere] if p]
+        texto_componente = " - ".join(partes) if partes else "Item"
+        
+        # Monta a estrutura sem a coluna 'Dispositivo'
         linhas_relatorio.append({
-            "Componente": row.get("Nome", "Item"),
-            "Dispositivo": f"{row.get('Marca', '')} ({row.get('Ampere', '')})",
+            "Componente": texto_componente,
             "Quantidade": int(qtd),
             "Preço Unitário": f"R$ {p_unit:,.2f}",
             "Subtotal Comercial": f"R$ {subtotal:,.2f}"
         })
+
 
     st.markdown("---")
     col1, col2 = st.columns(2)
