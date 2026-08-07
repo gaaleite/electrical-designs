@@ -125,16 +125,26 @@ if "1." in ambiente:
                     if precos_validos:
                         preco_final = min(precos_validos)
                 
-                # 2. Busca ativa por padrões de códigos comerciais e part numbers
-                padrao_codigo_direto = re.search(r'(?:C&oacute;digo|Codigo|Ref|Refer&ecirc;ncia|Referencia)[:\s]+([A-Z0-9\-_]{6,25})', html_content, re.IGNORECASE)
-                padrao_codigo_fabricante = re.search(r'\b([A-Z]{1,3}\d{[A-Z0-9\-_]{5,20})\b', html_content, re.IGNORECASE)
+                # 2. Busca pelo Código do Produto no HTML (Incluso varredura de snippets de texto)
+                # Tenta primeiro encontrar pelo rótulo explícito "Código:", "Ref:", "Modelo:"
+                padrao_codigo_direto = re.search(r'(?:C&oacute;digo|Codigo|Ref|Refer&ecirc;ncia|Referencia|Modelo)[:\s]+([A-Z0-9\-_]{6,25})', html_content, re.IGNORECASE)
+                
+                # Segunda tentativa: varre o texto atrás de Part Numbers complexos comuns (mistura de letras e números com mais de 6 dígitos)
+                padrao_part_number = re.search(r'\b([A-Z0-9]{2,5}\d{4,12}[A-Z0-9\-_]{2,10})\b', html_content, re.IGNORECASE)
+                
+                # Terceira tentativa: captura palavras isoladas longas em caixa alta misturadas com números (Ex: 3VA1116-4EE32-0AA0 ou S326304)
+                padrao_alfanumerico = re.search(r'\b([A-Z0-9]{4,10}[-\s][A-Z0-9]{4,10}[-\s][A-Z0-9]{4,10})\b|\b([A-Z]+\d+[A-Z0-9]{4,15})\b', html_content, re.IGNORECASE)
                 
                 if padrao_codigo_direto:
                     codigo_final = padrao_codigo_direto.group(1).strip()
-                elif padrao_codigo_fabricante:
-                    codigo_final = padrao_codigo_fabricante.group(1).strip()
+                elif padrao_part_number:
+                    codigo_final = padrao_part_number.group(1).strip()
+                elif padrao_alfanumerico:
+                    # Coleta o grupo que deu match na expressão regular alternativa
+                    g1, g2 = padrao_alfanumerico.groups()
+                    codigo_final = (g1 if g1 else g2).strip()
                 else:
-                    # Fallback estratégico: extrai o domínio da loja virtual que forneceu a cotação
+                    # Fallback final se falhar todas as anteriores: extrai o domínio da loja
                     sites_encontrados = re.findall(r'href="([^"]+)"', html_content)
                     dominios_filtrados = []
                     for s in sites_encontrados:
@@ -152,7 +162,6 @@ if "1." in ambiente:
 
     st.subheader("📋 Lista de Materiais do Painel (BOM)")
     
-    # Caixa de edição do ID configurada com tamanho estável ("small") e sem perder dados digitados
     df_editado = st.data_editor(
         st.session_state["componentes"], 
         num_rows="dynamic", 
@@ -214,7 +223,6 @@ if "1." in ambiente:
         nome = str(row.get("Nome", "")).strip()
         marca = str(row.get("Marca", "")).strip()
         
-        # Concatena o sufixo "A" no fim do Ampere apenas na exibição do Componente
         ampere = str(row.get("Ampere", "")).strip()
         if ampere and not ampere.upper().endswith("A"):
             ampere = f"{ampere}A"
@@ -277,17 +285,6 @@ if "1." in ambiente:
                 st.rerun()
 
     st.markdown("### 🔍 Pesquisar Orçamentos Salvos")
-    if st.session_state["historico_orcamentos"]:
-        lista_orcamentos = list(st.session_state["historico_orcamentos"].keys())
-        orcamento_selecionado = st.selectbox("Selecione um orçamento para carregar ou revisar:", ["-- Selecione --"] + lista_orcamentos)
-        
-        if orcamento_selecionado != "-- Selecione --":
-            dados_salvos = st.session_state["historico_orcamentos"][orcamento_selecionado]
-            
-            st.write(f"**Valor de Fechamento:** R$ {dados_salvos['total']:,.2f}")
-            st.dataframe(dados_salvos["relatorio"], use_container_width=True, hide_index=True)
-            
-
 
 # ==========================================
 # AMBIENTE 2: DIAGRAMA E LAYOUT (AUTOCAD)
