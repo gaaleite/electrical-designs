@@ -188,15 +188,23 @@ if "1." in ambiente:
         subtotal = p_unit * qtd
         total_general_painel += subtotal
         
+        id_item = row.get("id", "")
         nome = str(row.get("Nome", "")).strip()
         marca = str(row.get("Marca", "")).strip()
         ampere = str(row.get("Ampere", "")).strip()
         
+        # Cria a sequência textual para a coluna Componente
         partes = [p for p in [nome, marca, ampere] if p]
         texto_componente = " - ".join(partes) if partes else "Item"
         
+        # Gera o código do componente exatamente igual ao termo enviado para a busca de preço
+        texto_codigo = f"{nome} {ampere}".strip() if (nome or ampere) else ""
+        
+        # Nova estrutura da tabela de relatório ordenado
         linhas_relatorio.append({
+            "ID": id_item,
             "Componente": texto_componente,
+            "Código": texto_codigo,
             "Quantidade": int(qtd),
             "Preço Unitário": f"R$ {p_unit:,.2f}",
             "Subtotal Comercial": f"R$ {subtotal:,.2f}"
@@ -213,8 +221,6 @@ if "1." in ambiente:
     st.subheader("🛒 Relatório Consolidado para Orçamento Comercial")
     if linhas_relatorio:
         st.dataframe(pd.DataFrame(linhas_relatorio), use_container_width=True)
-
-
 
 
 # ==========================================
