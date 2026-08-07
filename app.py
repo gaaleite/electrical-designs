@@ -179,12 +179,15 @@ if "1." in ambiente:
         })
 
 
-    st.markdown("---")
+       st.markdown("---")
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f'<div class="metric-box"><h4>Valor de Aquisição de Materiais</h4><h2>R$ {total_general_painel:,.2f}</h2></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown(f'<div class="metric-box"><h4>Componentes Ativos na Lista</h4><h2>{int(df_editado["Qtd"].sum() if "Qtd" in df_editado.columns else 0)} unidades</h2></div>', unsafe_allow_html=True)
+        # Correção do Erro: Converte os valores vazios da coluna 'Qtd' para 0 antes de realizar a soma e a conversão para inteiro
+        qtd_total = int(pd.to_numeric(df_editado["Qtd"], errors='coerce').fillna(0).sum()) if "Qtd" in df_editado.columns else 0
+        st.markdown(f'<div class="metric-box"><h4>Componentes Ativos na Lista</h4><h2>{qtd_total} unidades</h2></div>', unsafe_allow_html=True)
+
 
     st.subheader("🛒 Relatório Consolidado para Orçamento Comercial")
     if linhas_relatorio:
