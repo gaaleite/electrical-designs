@@ -115,7 +115,7 @@ if "1." in ambiente:
         except Exception:
             pass
             
-        return TABELA_PRECOS_PADRAO.get(tipo, 50.00)
+        return TABELA_PRECOS_PADERÃO.get(tipo, 50.00)
 
     st.subheader("📋 Lista de Materiais do Painel (BOM)")
     
@@ -124,7 +124,6 @@ if "1." in ambiente:
         num_rows="dynamic", 
         use_container_width=True,
         key="editor_web_orcamento",
-        # Define a ordem exata das colunas exibidas na tela
         column_order=["id", "Nome", "Marca", "Ampere", "Qtd", "Preco_Unitario"],
         column_config={
             "id": st.column_config.NumberColumn("ID", disabled=False),
@@ -140,15 +139,13 @@ if "1." in ambiente:
     )
     st.session_state["componentes"] = df_editado
 
-
     if st.button("🔍 Sincronizar e Buscar Preços na Web em Tempo Real", type="primary"):
         with st.spinner("Conectando aos servidores de mercado e atualizando cotações..."):
             for idx, row in df_editado.iterrows():
-                ampere_item = str(row.get("Modelo", ""))  # Lê da chave interna 'Modelo' que agora se chama 'Ampere' na tela
-                tipo_item = str(row.get("Tipo", ""))
+                ampere_item = str(row.get("Ampere", ""))
+                nome_item = str(row.get("Nome", ""))
                 
-                # Chamada da função atualizada apenas com ampere e tipo
-                novo_preco = buscar_preco_api_aberta(ampere_item, tipo_item)
+                novo_preco = buscar_preco_api_aberta(ampere_item, nome_item)
                 df_editado.at[idx, "Preco_Unitario"] = novo_preco
             
             st.session_state["componentes"] = df_editado
@@ -162,32 +159,27 @@ if "1." in ambiente:
         qtd = pd.to_numeric(row.get("Qtd", 0), errors='coerce')
         if pd.isna(qtd): qtd = 0
         
-        # Correção do Erro: Trata valores None, vazios ou strings inválidas convertendo com segurança para 0.0
         p_unit = pd.to_numeric(row.get("Preco_Unitario", 0.0), errors='coerce')
         if pd.isna(p_unit): p_unit = 0.0
         
         subtotal = p_unit * qtd
         total_general_painel += subtotal
         
-        # Removida a marca do texto descritivo do dispositivo no relatório
         linhas_relatorio.append({
-            "Componente": row.get("Tag/Nome", "Item"),
-            "Dispositivo": f"{row.get('Tipo', '')} ({row.get('Modelo', '')})",
+            "Componente": row.get("Nome", "Item"),
+            "Dispositivo": f"{row.get('Marca', '')} ({row.get('Ampere', '')})",
             "Quantidade": int(qtd),
             "Preço Unitário": f"R$ {p_unit:,.2f}",
             "Subtotal Comercial": f"R$ {subtotal:,.2f}"
         })
 
-
-       st.markdown("---")
+    st.markdown("---")
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f'<div class="metric-box"><h4>Valor de Aquisição de Materiais</h4><h2>R$ {total_general_painel:,.2f}</h2></div>', unsafe_allow_html=True)
     with col2:
-        # Correção do Erro: Converte os valores vazios da coluna 'Qtd' para 0 antes de realizar a soma e a conversão para inteiro
         qtd_total = int(pd.to_numeric(df_editado["Qtd"], errors='coerce').fillna(0).sum()) if "Qtd" in df_editado.columns else 0
         st.markdown(f'<div class="metric-box"><h4>Componentes Ativos na Lista</h4><h2>{qtd_total} unidades</h2></div>', unsafe_allow_html=True)
-
 
     st.subheader("🛒 Relatório Consolidado para Orçamento Comercial")
     if linhas_relatorio:
