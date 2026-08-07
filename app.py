@@ -95,7 +95,7 @@ if "1." in ambiente:
 
     def buscar_preco_e_codigo_web(ampere, nome_item):
         preco_padrao = TABELA_PRECOS_PADRAO.get(nome_item, 50.00)
-        codigo_padrao = "Código não encontrado (Preço Padrão)"
+        codigo_padrao = "Preço Padrão (Local)"
         
         if not nome_item or str(nome_item).strip() == "":
             return preco_padrao, codigo_padrao
@@ -111,21 +111,24 @@ if "1." in ambiente:
             with urllib.request.urlopen(req, timeout=7) as response:
                 html_content = response.read().decode('utf-8', errors='ignore')
                 
-                # Encontra blocos de resultados para associar o preço ao título/código da página
-                resultados = re.findall(r'<a class="result__url"[^>]*>([^<]+)</a>.*?R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', html_content, re.DOTALL)
+                # Regex ajustada para capturar o link (href) e o valor monetário R$ na estrutura HTML do buscador
+                resultados = re.findall(r'href="([^"]+)"[^>]*>.*?R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', html_content, re.DOTALL | re.IGNORECASE)
                 
                 if resultados:
                     precos_validos = []
-                    for site, valor in resultados:
+                    for link, valor in resultados:
                         v_limpo = valor.replace('.', '').replace(',', '.')
                         val_float = float(v_limpo)
                         if val_float > 5.0:
-                            # Limpa o domínio do site para servir como o Código/Referência do fornecedor encontrado
-                            site_limpo = site.strip().replace("www.", "").split('/')[0]
-                            precos_validos.append((val_float, site_limpo))
+                            # Extrai o domínio principal do link para servir como Código do Fornecedor
+                            if "http" in link:
+                                dominio = link.split('//')[-1].split('/')[0].replace('www.', '')
+                            else:
+                                dominio = link.split('/')[0].replace('www.', '')
+                            precos_validos.append((val_float, dominio))
                     
                     if precos_validos:
-                        # Retorna a tupla com o menor preço encontrado e o respectivo domínio/código do site
+                        # Seleciona o par com o menor preço comercial encontrado
                         menor_registro = min(precos_validos, key=lambda x: x[0])
                         return menor_registro[0], menor_registro[1]
                         
@@ -149,11 +152,11 @@ if "1." in ambiente:
             "Ampere": st.column_config.TextColumn("Ampere", help="Digite a corrente em Ampere"),
             "Qtd": st.column_config.NumberColumn("Qtd", min_value=0, default=1),
             "Preco_Unitario": st.column_config.NumberColumn("Preço", format="R$ %.2f")
-        }
+        },
+        hide_index=True # Oculta o índice (0, 1, 2) da planilha superior de edição
     )
     st.session_state["componentes"] = df_editado
 
-    # Inicializa uma coluna oculta para guardar o código raspado da web na sessão se ela não existir
     if "Codigo_Web" not in st.session_state["componentes"].columns:
         st.session_state["componentes"]["Codigo_Web"] = "Não Sincronizado"
 
@@ -169,7 +172,6 @@ if "1." in ambiente:
                     ampere_item = str(row.get("Ampere", ""))
                     nome_item = str(row.get("Nome", ""))
                     
-                    # Retorna o menor preço e a identificação do local onde foi achado
                     menor_preco, codigo_fornecedor = buscar_preco_e_codigo_web(ampere_item, nome_item)
                     
                     df_atualizado.at[idx, "Preco_Unitario"] = menor_preco
@@ -197,7 +199,6 @@ if "1." in ambiente:
         nome = str(row.get("Nome", "")).strip()
         marca = str(row.get("Marca", "")).strip()
         
-        # Correção 1: Garante a formatação com o "A" caso exista valor de corrente informado
         ampere = str(row.get("Ampere", "")).strip()
         if ampere and not ampere.upper().endswith("A"):
             ampere = f"{ampere}A"
@@ -205,7 +206,6 @@ if "1." in ambiente:
         partes = [p for p in [nome, marca, ampere] if p]
         texto_componente = " - ".join(partes) if partes else "Item"
         
-        # Correção 2: Puxa o código da página do fornecedor que foi coletado pelo Google/DuckDuckGo
         texto_codigo = row.get("Codigo_Web", "Não Sincronizado") if "Codigo_Web" in df_editado.columns else "Não Sincronizado"
         
         linhas_relatorio.append({
@@ -228,7 +228,11 @@ if "1." in ambiente:
     st.subheader("🛒 Relatório Consolidado para Orçamento Comercial")
     if linhas_relatorio:
         df_relatorio_final = pd.DataFrame(linhas_relatorio)
-        st.dataframe(df_relatorio_final, use_container_width=True)
+        st.dataframe(
+            df_relatorio_final, 
+            use_container_width=True,
+            hide_index=True # Oculta definitivamente o índice '0' à esquerda do seu relatório final
+        )
 
     # ==========================================
     # SISTEMA DE SALVAMENTO E BUSCA (HISTÓRICO)
@@ -236,7 +240,7 @@ if "1." in ambiente:
     st.markdown("---")
     st.subheader("💾 Gerenciamento e Histórico de Orçamentos")
     
-    col_salvar1, col_salvar2 = st.columns([3, 1])
+    col_salvar1, col_salvar2 = st.columns()
     with col_salvar1:
         nome_orcamento = st.text_input("Identificação / Nome do Orçamento", placeholder="Ex: Orc_Painel_Cliente_A")
     with col_salvar2:
@@ -247,15 +251,12 @@ if "1." in ambiente:
             elif df_editado.empty:
                 st.warning("A planilha atual está vazia.")
             else:
-                # Armazena o estado completo atual da planilha e do relatório gerado
                 st.session_state["historico_orcamentos"][nome_orcamento] = {
                     "dados_brutos": df_editado.copy(),
                     "relatorio": pd.DataFrame(linhas_relatorio),
                     "total": total_general_painel
                 }
                 st.success(f"Orçamento '{nome_orcamento}' gravado no histórico!")
-                
-                # Reseta a planilha original de digitação deixando-a em branco
                 st.session_state["componentes"] = pd.DataFrame([{"id": 1, "Nome": "", "Marca": "", "Ampere": "", "Qtd": 1, "Preco_Unitario": 0.0}])
                 st.rerun()
 
@@ -268,7 +269,7 @@ if "1." in ambiente:
             dados_salvos = st.session_state["historico_orcamentos"][orcamento_selecionado]
             
             st.write(f"**Valor de Fechamento:** R$ {dados_salvos['total']:,.2f}")
-            st.dataframe(dados_salvos["relatorio"], use_container_width=True)
+            st.dataframe(dados_salvos["relatorio"], use_container_width=True, hide_index=True)
             
             if st.button("🔄 Recuperar e Editar Orçamento Selecionado"):
                 st.session_state["componentes"] = dados_salvos["dados_brutos"].copy()
@@ -276,6 +277,7 @@ if "1." in ambiente:
                 st.rerun()
     else:
         st.info("Nenhum orçamento salvo neste histórico até o momento.")
+
 
 
 
