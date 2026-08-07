@@ -93,51 +93,69 @@ if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
     st.markdown("Altere o Ampere na planilha abaixo e clique no botão para disparar a busca automática de preços comerciais na internet.")
 
-    def buscar_preco_e_codigo_web(ampere, nome_item):
+        def buscar_preco_e_codigo_web(ampere, nome_item, marca_item=""):
         preco_padrao = TABELA_PRECOS_PADRAO.get(nome_item, 50.00)
-        codigo_padrao = "Preço Padrão (Local)"
+        codigo_padrao = "Não encontrado"
         
         if not nome_item or str(nome_item).strip() == "":
             return preco_padrao, codigo_padrao
             
-        query = f"preço comercial {nome_item} {ampere}".strip()
+        # Monta uma busca comercial rica combinando o componente, marca e amperagem
+        termo_busca = f"{nome_item} {marca_item} {ampere}".strip()
+        query = f"preço comercial {termo_busca}"
         url = f"https://duckduckgo.com{urllib.parse.quote(query)}"
         
         try:
             req = urllib.request.Request(
                 url, 
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
             )
             with urllib.request.urlopen(req, timeout=7) as response:
                 html_content = response.read().decode('utf-8', errors='ignore')
                 
-                # Regex robusta para capturar links e valores monetários associados no HTML do buscador
-                resultados = re.findall(r'href="([^"]+)"[^>]*>.*?R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', html_content, re.DOTALL | re.IGNORECASE)
-                
-                if resultados:
+                # 1. Tenta extrair valores monetários
+                valores_encontrados = re.findall(r'R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', html_content)
+                preco_final = preco_padrao
+                if valores_encontrados:
                     precos_validos = []
-                    for link, valor in resultados:
-                        v_limpo = valor.replace('.', '').replace(',', '.')
+                    for v in valores_encontrados:
+                        v_limpo = v.replace('.', '').replace(',', '.')
                         val_float = float(v_limpo)
                         if val_float > 5.0:
-                            link_str = str(link)
-                            if "http" in link_str:
-                                dominio = link_str.split('//')[-1].split('/')[0].replace('www.', '')
-                            else:
-                                dominio = link_str.split('/')[0].replace('www.', '')
-                            precos_validos.append((val_float, dominio))
-                    
+                            precos_validos.append(val_float)
                     if precos_validos:
-                        # Retorna o par que contém o menor preço comercial encontrado
-                        menor_registro = min(precos_validos, key=lambda x: x[0])
-                        return menor_registro[0], menor_registro[1]
-                        
+                        preco_final = min(precos_validos)
+                
+                # 2. Busca ativa pelo "Código do produto" no texto da página indexada
+                # Padrão 1: Procura explicitamente pela palavra Código/Ref seguida de números/letras (ex: Código: A7B93000)
+                padrao_codigo_direto = re.search(r'(?:C&oacute;digo|Codigo|Ref|Refer&ecirc;ncia|Referencia)[:\s]+([A-Z0-9\-_]{6,20})', html_content, re.IGNORECASE)
+                
+                # Padrão 2: Fallback para capturar códigos de fabricantes elétricos (partes com letras e números misturados longos)
+                padrao_codigo_fabricante = re.search(r'\b([A-Z]{1,3}\d{[A-Z0-9\-_]{5,15})\b', html_content)
+                
+                if padrao_codigo_direto:
+                    codigo_final = padrao_codigo_direto.group(1).strip()
+                elif padrao_codigo_fabricante:
+                    codigo_final = padrao_codigo_fabricante.group(1).strip()
+                else:
+                    # Se não achar um código específico de fabricante, extrai o domínio do site vendedor como referência
+                    sites_encontrados = re.findall(r'href="([^"]+)"', html_content)
+                    dominios_filtrados = []
+                    for s in sites_encontrados:
+                        if "http" in s and "duckduckgo" not in s:
+                            dom = s.split('//')[-1].split('/')[0].replace('www.', '')
+                            dominios_filtrados.append(dom)
+                    codigo_final = dominios_filtrados[0] if dominios_filtrados else "Sob consulta"
+                
+                return preco_final, codigo_final
+                
         except Exception:
             pass
             
         return preco_padrao, codigo_padrao
 
     st.subheader("📋 Lista de Materiais do Painel (BOM)")
+
     
     # SOLUÇÃO DO BUG: O editor lê diretamente e salva as alterações na chave do session_state via parâmetro 'key'
     df_editado = st.data_editor(
@@ -162,7 +180,7 @@ if "1." in ambiente:
     if "Codigo_Web" not in st.session_state["componentes"].columns:
         st.session_state["componentes"]["Codigo_Web"] = "Não Sincronizado"
 
-    if st.button("🔍 Sincronizar e Buscar Preços na Web em Tempo Real", type="primary"):
+        if st.button("🔍 Sincronizar e Buscar Preços na Web em Tempo Real", type="primary"):
         if df_editado.empty:
             st.warning("Adicione pelo menos uma linha na tabela para buscar preços.")
         else:
@@ -173,8 +191,10 @@ if "1." in ambiente:
                 for idx, row in df_atualizado.iterrows():
                     ampere_item = str(row.get("Ampere", ""))
                     nome_item = str(row.get("Nome", ""))
+                    marca_item = str(row.get("Marca", ""))  # Coleta a marca digitada na tabela para refinar o robô
                     
-                    menor_preco, codigo_fornecedor = buscar_preco_e_codigo_web(ampere_item, nome_item)
+                    # Nova chamada passando o terceiro parâmetro opcional de marca
+                    menor_preco, codigo_fornecedor = buscar_preco_e_codigo_web(ampere_item, nome_item, marca_item)
                     
                     df_atualizado.at[idx, "Preco_Unitario"] = menor_preco
                     codigos_coletados.append(codigo_fornecedor)
