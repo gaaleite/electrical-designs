@@ -115,7 +115,9 @@ if "1." in ambiente:
         except Exception:
             pass
             
-        return TABELA_PRECOS_PADERÃO.get(tipo, 50.00)
+        # Correção do Erro: Alterado de TABELA_PRECOS_PADERÃO para TABELA_PRECOS_PADRAO
+        return TABELA_PRECOS_PADRAO.get(tipo, 50.00)
+
 
     st.subheader("📋 Lista de Materiais do Painel (BOM)")
     
