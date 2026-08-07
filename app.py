@@ -7,17 +7,15 @@ import urllib.request
 import urllib.parse
 import re
 
-# 1. Configuração da Página Profissional
+# ==========================================
+# 1. CONFIGURAÇÃO DA PÁGINA PROFISSIONAL
+# ==========================================
 st.set_page_config(
     page_title="CAD/IA - Painéis Elétricos Industriais", 
     page_icon="⚡", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# Inicializa o histórico global de orçamentos se não existir
-if "historico_orcamentos" not in st.session_state:
-    st.session_state["historico_orcamentos"] = {}
 
 # Estilização CSS para emular interface Dark de Softwares CAD
 st.markdown("""
@@ -29,32 +27,45 @@ st.markdown("""
 
 st.title("⚡ CAD & Roteador Industrial Inteligente")
 
-# --- BANCO DE PREÇOS AUXILIAR ---
+# --- BANCO DE PREÇOS AUXILIAR (FALLBACK DE SEGURANÇA) ---
 TABELA_PRECOS_PADRAO = {
-    "Disjuntor Motor": 180.00,
-    "Disjuntor Trifásico": 120.00,
-    "Contator de Potência": 145.00,
-    "Relé Térmico": 95.00,
-    "Barramento Cobre (Espinho)": 350.00,
-    "Chave Seccionadora": 280.00,
-    "Bloco DPS": 110.00,
-    "Fonte Chaveada 24V": 215.00,
-    "CLP Industrial": 1850.00
+    "disjuntor caixa moldada": 5200.00,
+    "chave seccionadora": 1650.00,
+    "disjuntor motor": 280.00,
+    "disjuntor": 120.00,
+    "contatora": 350.00,
+    "barramento de cobre": 450.00,
+    "clp industrial": 2500.00,
+    "relé térmico de sobrecarga": 180.00
+}
+
+# --- DICIONÁRIO DE CÓDIGOS VIGENTES ---
+DICIONARIO_CODIGOS_ATUAIS = {
+    "chave seccionadora": {
+        "siemens": {"630": "S326303", "600": "S326303", "400": "S324003", "250": "S322503", "100": "S321003"},
+        "weg": {"630": "FSW630-3P", "400": "FSW400-3P", "250": "FSW250-3P"},
+        "schneider": {"630": "INS630-LV431548", "400": "INS400-LV431540", "250": "INS431100"}
+    },
+    "disjuntor caixa moldada": {
+        "siemens": {"630": "3VA1463-4EE32-0AA0", "600": "3VA1460-4EE32-0AA0", "500": "3VA1450-4EE32-0AA0", "400": "3VA1340-4EE32-0AA0", "250": "3VA1225-4EE32-0AA0", "100": "3VA1110-4EE32-0AA0"},
+        "weg": {"630": "DWB630N630-3", "500": "DWB500N500-3", "400": "DWB400N400-3", "250": "DWB250N250-3"},
+        "schneider": {"630": "LV432078", "400": "LV432072", "250": "LV431620"}
+    },
+    "disjuntor": {
+        "siemens": {"100": "3VA1110-4EE32-0AA0", "63": "3VA1163-4EE32-0AA0", "32": "3RV2011-4EA10"},
+        "weg": {"63": "MDW-C63-3", "32": "MDW-C32-3"}
+    },
+    "contatora": {
+        "siemens": {"32": "3RT2027-1AP00", "25": "3RT2026-1AP00"},
+        "weg": {"32": "CWM32-00-30V24"}
+    }
 }
 
 # --- INICIALIZAÇÃO DOS ESTADOS DA SESSÃO ---
 if "componentes" not in st.session_state:
     st.session_state["componentes"] = pd.DataFrame([
-        {
-            "id": 1, 
-            "Nome": "", 
-            "Marca": "", 
-            "Ampere": "", 
-            "Qtd": 1, 
-            "Preco_Unitario": 0.0
-        }
+        {"id": 1, "Nome": "", "Marca": "", "Ampere": "", "Qtd": 1, "Preco_Unitario": 0.0}
     ])
-
 
 if "conexoes" not in st.session_state:
     st.session_state["conexoes"] = pd.DataFrame([
@@ -62,13 +73,12 @@ if "conexoes" not in st.session_state:
         {"origem_id": 2, "destino_id": 3, "cor_fio": "Preto"}
     ])
 
-# Garante a existência das novas colunas na tabela se houver reset de estado
-if "Marca" not in st.session_state["componentes"].columns:
-    st.session_state["componentes"]["Marca"] = ""
-if "Modelo" not in st.session_state["componentes"].columns:
-    st.session_state["componentes"]["Modelo"] = ""
-if "Preco_Unitario" not in st.session_state["componentes"].columns:
-    st.session_state["componentes"]["Preco_Unitario"] = 0.0
+if "historico_orcamentos" not in st.session_state:
+    st.session_state["historico_orcamentos"] = {}
+
+# Garante a coluna de cache para as rotinas de busca
+if "Codigo_Web" not in st.session_state["componentes"].columns:
+    st.session_state["componentes"]["Codigo_Web"] = "Não Sincronizado"
 
 # --- NAVEGAÇÃO ---
 st.sidebar.header("🕹️ Centro de Operações")
@@ -92,39 +102,6 @@ mapeamento_cores = {
 if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
     st.markdown("Preencha as informações na planilha abaixo e utilize o formulário para gerenciar, sincronizar ou salvar seus dados sem perdas.")
-
-    # DICIONÁRIOS REINJETADOS NO SCRIPT PYTHON PARA USO NAS BUSCAS EM TEMPO REAL
-    TABELA_PRECOS_PADRAO = {
-        "disjuntor caixa moldada": 5200.00,
-        "chave seccionadora": 1650.00,
-        "disjuntor motor": 280.00,
-        "disjuntor": 120.00,
-        "contatora": 350.00,
-        "barramento de cobre": 450.00,
-        "clp industrial": 2500.00,
-        "relé térmico de sobrecarga": 180.00
-    }
-
-    DICIONARIO_CODIGOS_ATUAIS = {
-        "chave seccionadora": {
-            "siemens": {"630": "S326303", "600": "S326303", "400": "S324003", "250": "S322503", "100": "S321003"},
-            "weg": {"630": "FSW630-3P", "400": "FSW400-3P", "250": "FSW250-3P"},
-            "schneider": {"630": "INS630-LV431548", "400": "INS400-LV431540", "250": "INS431100"}
-        },
-        "disjuntor caixa moldada": {
-            "siemens": {"630": "3VA1463-4EE32-0AA0", "600": "3VA1460-4EE32-0AA0", "500": "3VA1450-4EE32-0AA0", "400": "3VA1340-4EE32-0AA0", "250": "3VA1225-4EE32-0AA0", "100": "3VA1110-4EE32-0AA0"},
-            "weg": {"630": "DWB630N630-3", "500": "DWB500N500-3", "400": "DWB400N400-3", "250": "DWB250N250-3"},
-            "schneider": {"630": "LV432078", "400": "LV432072", "250": "LV431620"}
-        },
-        "disjuntor": {
-            "siemens": {"100": "3VA1110-4EE32-0AA0", "63": "3VA1163-4EE32-0AA0", "32": "3RV2011-4EA10"},
-            "weg": {"63": "MDW-C63-3", "32": "MDW-C32-3"}
-        },
-        "contatora": {
-            "siemens": {"32": "3RT2027-1AP00", "25": "3RT2026-1AP00"},
-            "weg": {"32": "CWM32-00-30V24"}
-        }
-    }
 
     def buscar_preco_e_codigo_web(ampere, nome_item, marca_item=""):
         nome_limpo = str(nome_item).strip().lower()
@@ -186,9 +163,6 @@ if "1." in ambiente:
         
         return preco_padrao, codigo_final
 
-    if "componentes" in st.session_state and "Codigo_Web" not in st.session_state["componentes"].columns:
-        st.session_state["componentes"]["Codigo_Web"] = "Não Sincronizado"
-
     st.subheader("📋 Lista de Materiais do Painel (BOM)")
     
     with st.form("formulario_planilha_bom"):
@@ -247,47 +221,6 @@ if "1." in ambiente:
     linhas_relatorio = []
 
     for idx, row in df_editado.iterrows():
-        qtd = pd.to_numeric(row.get("Qtd", 0), errors='coerce')
-        if pd.isna(qtd): qtd = 0
-        
-        p_unit = pd.to_numeric(row.get("Preco_Unitario", 0.0), errors='coerce')
-        if pd.isna(p_unit): p_unit = 0.0
-        
-        subtotal = p_unit * qtd
-        total_general_painel += subtotal
-        
-        id_item = row.get("id", "")
-        nome = str(row.get("Nome", "")).strip()
-        marca = str(row.get("Marca", "")).strip()
-        
-        ampere = str(row.get("Ampere", "")).strip()
-        if ampere and not ampere.upper().endswith("A"):
-            ampere = f"{ampere}A"
-        
-        partes = [p for p in [nome, marca, ampere] if p]
-        texto_componente = " - ".join(partes) if partes else "Item"
-        
-        texto_codigo = row.get("Codigo_Web", "Não Sincronizado") if "Codigo_Web" in df_editado.columns else "Não Sincronizado"
-        
-        linhas_relatorio.append({
-            "ID": id_item,
-            "Componente": texto_componente,
-            "Código": texto_codigo,
-            "Quantidade": int(qtd),
-            "Preço Unitário": f"R$ {p_unit:,.2f}",
-            "Subtotal Comercial": f"R$ {subtotal:,.2f}"
-        })
-
-    st.markdown("---")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f'<div class="metric-box"><h4>Valor de Aquisição de Materiais</h4><h2>R$ {total_general_painel:,.2f}</h2></div>', unsafe_allow_html=True)
-    with col2:
-        qtd_total = int(pd.to_numeric(df_editado["Qtd"], errors='coerce').fillna(0).sum()) if "Qtd" in df_editado.columns else 0
-        st.markdown(f'<div class="metric-box"><h4>Componentes Ativos na Lista</h4><h2>{qtd_total} unidades</h2></div>', unsafe_allow_html=True)
-
-    st.subheader("🛒 Relatório Consolidado para Orçamento Comercial")
-    if linhas_relatorio:
 
 
 # ==========================================
