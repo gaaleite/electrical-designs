@@ -99,36 +99,29 @@ if "1." in ambiente:
         if not nome_item or str(nome_item).strip() == "":
             return preco_padrao, "Não encontrado"
             
-        # Monta um termo comercial idêntico ao padrão de busca do usuário do print anterior
         termo_busca = f"{nome_item} {marca_item} {ampere}".strip()
         query_completa = f"código comercial preço {termo_busca}"
-        
-        # Conexão direta via API aberta JSON para ignorar o bloqueio de robôs (Anti-Bot Bypass)
         url = f"https://duckduckgo.com{urllib.parse.quote(query_completa)}&format=json&no_html=1&skip_disambig=1"
         
         try:
             req = urllib.request.Request(
                 url, 
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
             )
             with urllib.request.urlopen(req, timeout=5) as response:
                 dados_json = json.loads(response.read().decode('utf-8', errors='ignore'))
-                
-                # Consolida todos os textos de resposta do indexador comercial
                 texto_bruto = str(dados_json.get("AbstractText", "")) + " " + str(dados_json.get("RelatedTopics", ""))
                 
-                # 1. Extração Dinâmica de Código de Catálogo (Part Number) baseada no seu print
-                # Padrão alfanumérico exato de fabricantes elétricos (combinação mista longa, ex: A7B93000024989 ou S326304)
+                # Extração Dinâmica de Código de Catálogo (Part Number)
                 match_codigo = re.search(r'\b([A-Z0-9]{3,8}\d{4,15}[A-Z0-9-_]{0,10})\b|\b([A-Z]{1,4}\d{4,12})\b', texto_bruto, re.IGNORECASE)
                 codigo_encontrado = match_codigo.group(0).upper().strip() if match_codigo else None
                 
-                # Se não capturar o serial, busca pela string literal do rótulo "Código:"
                 if not codigo_encontrado:
                     match_rotulo = re.search(r'(?:codigo|ref|referencia)[:\s]+([A-Z0-9-_]{6,25})', texto_bruto, re.IGNORECASE)
                     if match_rotulo:
                         codigo_encontrado = match_rotulo.group(1).upper().strip()
                 
-                # 2. Extração Dinâmica de Preços Reais de Mercado
+                # Extração Dinâmica de Preços Reais de Mercado
                 valores_moeda = re.findall(r'R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', texto_bruto)
                 preco_encontrado = None
                 
@@ -137,12 +130,11 @@ if "1." in ambiente:
                     for v in valores_moeda:
                         v_limpo = v.replace('.', '').replace(',', '.')
                         val_float = float(v_limpo)
-                        if val_float > 10.0: # Filtra ruídos metálicos abaixo de 10 reais
+                        if val_float > 10.0:
                             lista_precos.append(val_float)
                     if lista_precos:
                         preco_encontrado = min(lista_precos)
                 
-                # Retorna os dados raspados ou recorre ao fallback se o e-commerce omitir o parâmetro
                 final_preco = preco_encontrado if preco_encontrado else preco_padrao
                 final_codigo = codigo_encontrado if codigo_encontrado else f"Ref-{ampere if ampere else 'PADRAO'}"
                 
@@ -151,7 +143,6 @@ if "1." in ambiente:
         except Exception:
             pass
             
-        # Fallback de segurança gerando referências estruturadas caso caia em modo local offline
         return preco_padrao, f"Ref-{ampere if ampere else 'PADRAO'}"
 
     # Garante a existência estável das colunas de cache na memória do sistema
@@ -160,7 +151,7 @@ if "1." in ambiente:
 
     st.subheader("📋 Lista de Materiais do Painel (BOM)")
     
-    # PROTEÇÃO CONTRA PERDA DE DADOS: Uso do escopo de Formulário para travar o estado do teclado
+    # Proteção de teclado utilizando Form do Streamlit
     with st.form("formulario_planilha_bom"):
         df_editado = st.data_editor(
             st.session_state["componentes"], 
@@ -203,7 +194,6 @@ if "1." in ambiente:
                     nome_item = str(row.get("Nome", ""))
                     marca_item = str(row.get("Marca", ""))
                     
-                    # Dispara a busca e injeta dinamicamente o valor do site e do part-number
                     menor_preco, codigo_fornecedor = buscar_preco_e_codigo_web(ampere_item, nome_item, marca_item)
                     
                     df_atualizado.at[idx, "Preco_Unitario"] = menor_preco
@@ -284,6 +274,22 @@ if "1." in ambiente:
                 st.warning("A planilha atual está vazia.")
             else:
                 st.session_state["historico_orcamentos"][nome_orcamento] = {
+                    "dados_brutos": df_editado.copy(),
+                    "relatorio": pd.DataFrame(linhas_relatorio),
+                    "total": total_general_painel
+                }
+                st.success(f"Orçamento '{nome_orcamento}' gravado no histórico!")
+                st.session_state["componentes"] = pd.DataFrame([{"id": 1, "Nome": "", "Marca": "", "Ampere": "", "Qtd": 1, "Preco_Unitario": 0.0}])
+                st.rerun()
+
+    st.markdown("### 🔍 Pesquisar Orçamentos Salvos")
+    if st.session_state["historico_orcamentos"]:
+        lista_orcamentos = list(st.session_state["historico_orcamentos"].keys())
+        orcamento_selecionado = st.selectbox("Selecione um orçamento para carregar ou revisar:", ["-- Selecione --"] + lista_orcamentos)
+        
+        if orcamento_selecionado != "-- Selecione --":
+            dados_salvos = st.session_state["historico_orcamentos"][orcamento_selecionado]
+            
 
 # ==========================================
 # AMBIENTE 2: DIAGRAMA E LAYOUT (AUTOCAD)
