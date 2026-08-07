@@ -41,7 +41,7 @@ TABELA_PRECOS_PADRAO = {
 # --- INICIALIZAÇÃO DOS ESTADOS DA SESSÃO ---
 if "componentes" not in st.session_state:
     st.session_state["componentes"] = pd.DataFrame([
-        {"id": 1, "Nome": " ", "Tipo": " ", "Apere": " ", "Qtd": , "Preco Unitario": }
+        {"id": 1, "Nome": " ", "Tipo": " ", "Apere": " ", "Qtd": , "Preco Unitario": " "}
     ])
 
 if "conexoes" not in st.session_state:
