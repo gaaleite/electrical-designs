@@ -111,7 +111,7 @@ if "1." in ambiente:
             with urllib.request.urlopen(req, timeout=7) as response:
                 html_content = response.read().decode('utf-8', errors='ignore')
                 
-                # Regex ajustada para capturar o link (href) e o valor monetário R$ na estrutura HTML do buscador
+                # Regex robusta para capturar links e valores monetários associados no HTML do buscador
                 resultados = re.findall(r'href="([^"]+)"[^>]*>.*?R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', html_content, re.DOTALL | re.IGNORECASE)
                 
                 if resultados:
@@ -120,15 +120,15 @@ if "1." in ambiente:
                         v_limpo = valor.replace('.', '').replace(',', '.')
                         val_float = float(v_limpo)
                         if val_float > 5.0:
-                            # Extrai o domínio principal do link para servir como Código do Fornecedor
-                            if "http" in link:
-                                dominio = link.split('//')[-1].split('/')[0].replace('www.', '')
+                            # Corrige o tratamento de strings e extrai o domínio limpo do link
+                            link_str = str(link)
+                            if "http" in link_str:
+                                dominio = link_str.split('//')[-1].split('/')[0].replace('www.', '')
                             else:
-                                dominio = link.split('/')[0].replace('www.', '')
+                                dominio = link_str.split('/')[0].replace('www.', '')
                             precos_validos.append((val_float, dominio))
                     
                     if precos_validos:
-                        # Seleciona o par com o menor preço comercial encontrado
                         menor_registro = min(precos_validos, key=lambda x: x[0])
                         return menor_registro[0], menor_registro[1]
                         
@@ -146,14 +146,15 @@ if "1." in ambiente:
         key="editor_web_orcamento",
         column_order=["id", "Nome", "Marca", "Ampere", "Qtd", "Preco_Unitario"],
         column_config={
-            "id": st.column_config.NumberColumn("ID", disabled=False),
+            # Ajuste de tamanho: Define uma largura pequena e fixa (width="small") para impedir que a célula de ID estique
+            "id": st.column_config.NumberColumn("ID", disabled=False, width="small"),
             "Nome": st.column_config.TextColumn("Nome"),
             "Marca": st.column_config.TextColumn("Marca"),
             "Ampere": st.column_config.TextColumn("Ampere", help="Digite a corrente em Ampere"),
             "Qtd": st.column_config.NumberColumn("Qtd", min_value=0, default=1),
             "Preco_Unitario": st.column_config.NumberColumn("Preço", format="R$ %.2f")
         },
-        hide_index=True # Oculta o índice (0, 1, 2) da planilha superior de edição
+        hide_index=True
     )
     st.session_state["componentes"] = df_editado
 
@@ -231,7 +232,7 @@ if "1." in ambiente:
         st.dataframe(
             df_relatorio_final, 
             use_container_width=True,
-            hide_index=True # Oculta definitivamente o índice '0' à esquerda do seu relatório final
+            hide_index=True
         )
 
     # ==========================================
@@ -240,7 +241,8 @@ if "1." in ambiente:
     st.markdown("---")
     st.subheader("💾 Gerenciamento e Histórico de Orçamentos")
     
-    col_salvar1, col_salvar2 = st.columns()
+    # Correção do Erro: Adicionado o argumento obrigatório 2 para gerar duas colunas válidas
+    col_salvar1, col_salvar2 = st.columns(2)
     with col_salvar1:
         nome_orcamento = st.text_input("Identificação / Nome do Orçamento", placeholder="Ex: Orc_Painel_Cliente_A")
     with col_salvar2:
@@ -277,8 +279,6 @@ if "1." in ambiente:
                 st.rerun()
     else:
         st.info("Nenhum orçamento salvo neste histórico até o momento.")
-
-
 
 
 # ==========================================
