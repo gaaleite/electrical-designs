@@ -6,6 +6,8 @@ import json
 import urllib.request
 import urllib.parse
 import re
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA PROFISSIONAL
@@ -61,25 +63,38 @@ DICIONARIO_CODIGOS_ATUAIS = {
     }
 }
 
-# --- INICIALIZAÇÃO DOS ESTADOS DA SESSÃO ---
+# --- FUNÇÃO DE CONVERSÃO DE DATAFRAME PARA XML ---
+def converter_df_para_xml(df: pd.DataFrame, root_element: str = "ListaDeMateriais", item_element: str = "Componente") -> str:
+    """Converte um DataFrame do pandas em uma string formatada em XML."""
+    root = ET.Element(root_element)
+    for _, row in df.iterrows():
+        item = ET.SubElement(root, item_element)
+        for col in df.columns:
+            child = ET.SubElement(item, str(col).replace(" ", "_"))
+            val = str(row[col]) if pd.notna(row[col]) else ""
+            child.text = val
+    
+    xml_bruto = ET.tostring(root, encoding="utf-8")
+    xml_formatado = minidom.parseString(xml_bruto).toprettyxml(indent="  ")
+    return xml_formatado
+
+# --- INICIALIZAÇÃO DOS ESTADOS DA SESSÃO (AGORA INICIAM LIMPOS) ---
 if "componentes" not in st.session_state:
-    st.session_state["componentes"] = pd.DataFrame([
-        {"id": 1, "Nome": "Disjuntor Caixa Moldada", "Marca": "Siemens", "Ampere": "630A", "Qtd": 1, "Preco_Unitario": 5200.00},
-        {"id": 2, "Nome": "Contatora", "Marca": "Siemens", "Ampere": "32A", "Qtd": 2, "Preco_Unitario": 350.00},
-        {"id": 3, "Nome": "Disjuntor Motor", "Marca": "WEG", "Ampere": "32A", "Qtd": 1, "Preco_Unitario": 280.00}
-    ])
+    st.session_state["componentes"] = pd.DataFrame(
+        columns=["id", "Nome", "Marca", "Ampere", "Qtd", "Preco_Unitario", "Codigo_Web"]
+    )
 
 if "conexoes" not in st.session_state:
-    st.session_state["conexoes"] = pd.DataFrame([
-        {"origem_id": 1, "destino_id": 2, "cor_fio": "Vermelho"},
-        {"origem_id": 2, "destino_id": 3, "cor_fio": "Preto"}
-    ])
+    st.session_state["conexoes"] = pd.DataFrame(
+        columns=["origem_id", "destino_id", "cor_fio"]
+    )
 
 if "historico_orcamentos" not in st.session_state:
     st.session_state["historico_orcamentos"] = {}
 
+# Garante a coluna de cache para as rotinas de busca
 if "Codigo_Web" not in st.session_state["componentes"].columns:
-    st.session_state["componentes"]["Codigo_Web"] = "Não Sincronizado"
+    st.session_state["componentes"]["Codigo_Web"] = ""
 
 # --- NAVEGAÇÃO ---
 st.sidebar.header("🕹️ Centro de Operações")
@@ -102,7 +117,7 @@ mapeamento_cores = {
 # ==========================================
 if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
-    st.markdown("Preencha as informações na planilha abaixo e utilize o formulário para gerenciar, sincronizar ou salvar seus dados sem perdas.")
+    st.markdown("Preencha as informações na planilha abaixo. A tabela inicia vazia para que você insira os dados do seu projeto.")
 
     def buscar_preco_e_codigo_web(ampere, nome_item, marca_item=""):
         nome_limpo = str(nome_item).strip().lower()
@@ -171,14 +186,15 @@ if "1." in ambiente:
             num_rows="dynamic", 
             use_container_width=True,
             key="componentes_editor_key",
-            column_order=["id", "Nome", "Marca", "Ampere", "Qtd", "Preco_Unitario"],
+            column_order=["id", "Nome", "Marca", "Ampere", "Qtd", "Preco_Unitario", "Codigo_Web"],
             column_config={
                 "id": st.column_config.NumberColumn("ID", disabled=False, width="small"),
                 "Nome": st.column_config.TextColumn("Nome"),
                 "Marca": st.column_config.TextColumn("Marca"),
                 "Ampere": st.column_config.TextColumn("Ampere"),
                 "Qtd": st.column_config.NumberColumn("Qtd", min_value=0, default=1),
-                "Preco_Unitario": st.column_config.NumberColumn("Preço", format="R$ %.2f")
+                "Preco_Unitario": st.column_config.NumberColumn("Preço Unitário", format="R$ %.2f"),
+                "Codigo_Web": st.column_config.TextColumn("Código Fornecedor / Web")
             },
             hide_index=True
         )
@@ -195,10 +211,10 @@ if "1." in ambiente:
         st.rerun()
 
     if sincronizar_web:
-        if df_editado.empty:
-            st.warning("Adicione pelo menos uma linha na tabela para buscar preços.")
+        if df_editado.empty or df_editado.dropna(how="all").empty:
+            st.warning("Adicione pelo menos um item na tabela para buscar preços.")
         else:
-            with st.spinner("Conectando aos servidores de mercado e calculando os modelos mais vendidos..."):
+            with st.spinner("Conectando aos servidores de mercado e buscando códigos comerciais..."):
                 df_atualizado = df_editado.copy()
                 codigos_coletados = []
                 
@@ -207,32 +223,57 @@ if "1." in ambiente:
                     nome_item = str(row.get("Nome", ""))
                     marca_item = str(row.get("Marca", ""))
                     
+                    if not nome_item or str(nome_item).strip() == "":
+                        codigos_coletados.append("")
+                        continue
+
                     menor_preco, codigo_fornecedor = buscar_preco_e_codigo_web(ampere_item, nome_item, marca_item)
                     
-                    df_atualizado.at[idx, "Preco_Unitario"] = menor_preco
+                    # Atualiza apenas se o preço unitário for 0 ou se desejar forçar o valor da busca
+                    if row.get("Preco_Unitario", 0) == 0:
+                        df_atualizado.at[idx, "Preco_Unitario"] = menor_preco
+                        
                     codigos_coletados.append(codigo_fornecedor)
                 
                 df_atualizado["Codigo_Web"] = codigos_coletados
                 st.session_state["componentes"] = df_atualizado
-                st.success("Preços e códigos comerciais atualizados com sucesso!")
+                st.success("Preços e códigos comerciais sincronizados!")
                 st.rerun()
 
-    # Cálculo do resumo financeiro
+    # --- SESSÃO DE DOWNLOAD EM XML E RESUMO FINANCIAL ---
+    st.markdown("---")
+    col_fin1, col_fin2, col_export = st.columns([1, 1, 1])
+
     total_geral_painel = 0.0
-    st.subheader("💰 Resumo Financeiro do Projeto")
-    
     for idx, row in st.session_state["componentes"].iterrows():
-        qtd = row.get("Qtd", 0)
-        preco = row.get("Preco_Unitario", 0.0)
-        subtotal = qtd * preco
-        total_geral_painel += subtotal
+        try:
+            qtd = float(row.get("Qtd", 0))
+            preco = float(row.get("Preco_Unitario", 0.0))
+            total_geral_painel += (qtd * preco)
+        except (ValueError, TypeError):
+            pass
 
-    col_met1, col_met2 = st.columns(2)
-    with col_met1:
-        st.metric("Total de Componentes Distintos", len(st.session_state["componentes"]))
-    with col_met2:
+    with col_fin1:
+        st.metric("Total de Componentes", len(st.session_state["componentes"]))
+    with col_fin2:
         st.metric("Custo Total Estimado (BOM)", f"R$ {total_geral_painel:,.2f}")
-
+    
+    with col_export:
+        st.markdown("**💾 Exportar Projeto**")
+        df_para_exportar = st.session_state["componentes"]
+        
+        if not df_para_exportar.empty:
+            xml_string = converter_df_para_xml(df_para_exportar, root_element="ProjetoPainelEletrico", item_element="Componente")
+            
+            st.download_button(
+                label="📥 Baixar Planilha em XML",
+                data=xml_string,
+                file_name="lista_materiais_painel.xml",
+                mime="application/xml",
+                use_container_width=True
+            )
+        else:
+            st.info("Insira dados na tabela para habilitar o download em XML.")
 
 # ==========================================
 # AMBIENTE 2: DIAGRAMA E LAYOUT (AUTOCAD)
@@ -246,61 +287,74 @@ if "2." in ambiente:
         df_fios = st.data_editor(st.session_state["conexoes"], num_rows="dynamic", use_container_width=True, key="editor_fios")
         st.session_state["conexoes"] = df_fios
         
+        if not df_fios.empty:
+            xml_fios = converter_df_para_xml(df_fios, root_element="ConexoesEletricas", item_element="Fio")
+            st.download_button(
+                label="📥 Baixar Diagrama de Fios (.XML)",
+                data=xml_fios,
+                file_name="conexoes_fios.xml",
+                mime="application/xml",
+                use_container_width=True
+            )
+        
     with col_canvas:
         st.subheader("🖥️ Esquemático Unifilar / Trifilar")
-        comp_df = st.session_state["componentes"]
-        posicoes = {}
+        comp_df = st.session_state["componentes"].dropna(subset=["id"])
         
-        num_comp = len(comp_df) if len(comp_df) > 0 else 1
-        passo_x = 800 / num_comp
-        
-        for i, (_, row) in enumerate(comp_df.iterrows()):
-            c_id = row.get("id")
-            if pd.isna(c_id): 
-                continue
-            posicoes[int(c_id)] = {
-                "x": 100 + (i * passo_x * 0.8), 
-                "y": 250, 
-                "nome": str(row.get("Nome", f"ID {c_id}"))
-            }
-
-        fig, ax = plt.subplots(figsize=(11, 6), facecolor='#151515')
-        ax.set_facecolor('#151515')
-        largura_box, altura_box = 100, 80
-        
-        for c_id, pos in posicoes.items():
-            rect = plt.Rectangle((pos["x"] - largura_box/2, pos["y"] - altura_box/2), largura_box, altura_box, facecolor='#2A2A2A', edgecolor='#00FFCC', linewidth=2)
-            ax.add_patch(rect)
-            ax.text(pos["x"], pos["y"], f"ID {c_id}\n{pos['nome']}", ha='center', va='center', color='white', fontsize=8, fontweight='bold')
+        if comp_df.empty:
+            st.warning("Nenhum componente cadastrado. Vá até a aba '1. Dimensionamento e Orçamento' e insira componentes na tabela.")
+        else:
+            posicoes = {}
+            num_comp = len(comp_df)
+            passo_x = 800 / (num_comp if num_comp > 0 else 1)
             
-        for _, fio in df_fios.iterrows():
-            try:
-                origem_id = int(fio["origem_id"]) if pd.notna(fio["origem_id"]) else None
-                destino_id = int(fio["destino_id"]) if pd.notna(fio["destino_id"]) else None
-                
-                origem = posicoes.get(origem_id)
-                destino = posicoes.get(destino_id)
-                
-                if not origem or not destino: 
+            for i, (_, row) in enumerate(comp_df.iterrows()):
+                c_id = row.get("id")
+                if pd.isna(c_id): 
                     continue
-                    
-                meio_x = (origem["x"] + destino["x"]) / 2
-                xs = [origem["x"], meio_x, meio_x, destino["x"]]
-                ys = [origem["y"], origem["y"], destino["y"], destino["y"]]
-                cor_plot = mapeamento_cores.get(str(fio.get("cor_fio", "Azul")).strip().lower(), "cyan")
-                
-                ax.plot(xs, ys, color=cor_plot, linewidth=2)
-                ax.annotate('', xy=(destino["x"], destino["y"]), xytext=(meio_x, destino["y"]), arrowprops=dict(arrowstyle="->", color=cor_plot, lw=1.5))
-            except Exception:
-                continue
+                posicoes[int(c_id)] = {
+                    "x": 100 + (i * passo_x * 0.8), 
+                    "y": 250, 
+                    "nome": str(row.get("Nome", f"ID {c_id}"))
+                }
 
-        ax.set_xlim(0, 1000)
-        ax.set_ylim(0, 500)
-        ax.grid(True, color='#252525', linestyle='--', linewidth=0.5)
-        ax.invert_yaxis()
-        for spine in ax.spines.values(): 
-            spine.set_visible(False)
-        st.pyplot(fig)
+            fig, ax = plt.subplots(figsize=(11, 6), facecolor='#151515')
+            ax.set_facecolor('#151515')
+            largura_box, altura_box = 100, 80
+            
+            for c_id, pos in posicoes.items():
+                rect = plt.Rectangle((pos["x"] - largura_box/2, pos["y"] - altura_box/2), largura_box, altura_box, facecolor='#2A2A2A', edgecolor='#00FFCC', linewidth=2)
+                ax.add_patch(rect)
+                ax.text(pos["x"], pos["y"], f"ID {c_id}\n{pos['nome']}", ha='center', va='center', color='white', fontsize=8, fontweight='bold')
+                
+            for _, fio in df_fios.iterrows():
+                try:
+                    origem_id = int(fio["origem_id"]) if pd.notna(fio["origem_id"]) else None
+                    destino_id = int(fio["destino_id"]) if pd.notna(fio["destino_id"]) else None
+                    
+                    origem = posicoes.get(origem_id)
+                    destino = posicoes.get(destino_id)
+                    
+                    if not origem or not destino: 
+                        continue
+                        
+                    meio_x = (origem["x"] + destino["x"]) / 2
+                    xs = [origem["x"], meio_x, meio_x, destino["x"]]
+                    ys = [origem["y"], origem["y"], destino["y"], destino["y"]]
+                    cor_plot = mapeamento_cores.get(str(fio.get("cor_fio", "Azul")).strip().lower(), "cyan")
+                    
+                    ax.plot(xs, ys, color=cor_plot, linewidth=2)
+                    ax.annotate('', xy=(destino["x"], destino["y"]), xytext=(meio_x, destino["y"]), arrowprops=dict(arrowstyle="->", color=cor_plot, lw=1.5))
+                except Exception:
+                    continue
+
+            ax.set_xlim(0, 1000)
+            ax.set_ylim(0, 500)
+            ax.grid(True, color='#252525', linestyle='--', linewidth=0.5)
+            ax.invert_yaxis()
+            for spine in ax.spines.values(): 
+                spine.set_visible(False)
+            st.pyplot(fig)
 
 # ==========================================
 # AMBIENTE 3: ASSISTENTE DE IA COOPERATIVO
