@@ -132,7 +132,6 @@ if "1." in ambiente:
             with urllib.request.urlopen(req, timeout=6) as response:
                 html_content = response.read().decode('utf-8', errors='ignore')
                 
-                # 1. Extração de preços comerciais reais
                 valores_moeda = re.findall(r'R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', html_content)
                 if valores_moeda:
                     lista_precos = []
@@ -144,7 +143,6 @@ if "1." in ambiente:
                     if lista_precos:
                         preco_padrao = min(lista_precos)
                 
-                # 2. Busca ativa no HTML por part numbers industriais vigentes
                 codigos_candidatos = []
                 matches_part_number = re.findall(r'\b([A-Z0-9]{3,10}[-_\s][A-Z0-9]{3,10}[-_\s][A-Z0-9]{2,10})\b|\b([A-Z]{2,4}\d{4,15}[A-Z0-9-]{0,10})\b', html_content, re.IGNORECASE)
                 
@@ -161,13 +159,11 @@ if "1." in ambiente:
         except Exception:
             pass
             
-        # MECANISMO DE RETORNO INTELIGENTE ATUALIZADO (DICTIONARY BACKUP)
         if nome_limpo in DICIONARIO_CODIGOS_ATUAIS:
             if marca_limpo in DICIONARIO_CODIGOS_ATUAIS[nome_limpo]:
                 if ampere_limpo in DICIONARIO_CODIGOS_ATUAIS[nome_limpo][marca_limpo]:
                     return preco_padrao, DICIONARIO_CODIGOS_ATUAIS[nome_limpo][marca_limpo][ampere_limpo]
         
-        # Fallback genérico moderno se não constar no dicionário de chaves comuns
         ref_moderna = f"{marca_item[:3].upper() if marca_item else 'REF'}-{ampere_limpo}"
         return preco_padrao, ref_moderna
 
@@ -286,8 +282,13 @@ if "1." in ambiente:
     st.markdown("---")
     st.subheader("💾 Gerenciamento e Histórico de Orçamentos")
     
-    col_salvar1, col_salvar2 = st.columns(2)
-    with col_salvar1:
+    nome_orcamento = st.text_input("Identificação / Nome do Orçamento", placeholder="Ex: Orc_Painel_Cliente_A")
+    if st.button("💾 Salvar Planilha", use_container_width=True):
+        if nome_orcamento.strip() == "":
+            st.warning("Insira um nome válido para salvar.")
+        elif df_editado.empty:
+            st.warning("A planilha atual está vazia.")
+        else:
 
 
 # ==========================================
