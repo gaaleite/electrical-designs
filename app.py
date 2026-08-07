@@ -93,14 +93,35 @@ if "1." in ambiente:
     st.markdown('<div class="cad-header">📊 Engenharia de Materiais & Orçamento Web Real-Time</div>', unsafe_allow_html=True)
     st.markdown("Preencha as informações na planilha abaixo e utilize o formulário para gerenciar, sincronizar ou salvar seus dados sem perdas.")
 
+    # DICIONÁRIO DE BACKUP INTELIGENTE COM CÓDIGOS DE CATÁLOGO INDUSTRIAIS ATUAIS
+    DICIONARIO_CODIGOS_ATUAIS = {
+        "chave seccionadora": {
+            "siemens": {"630": "3VA1463-4EE32-0AA0", "600": "3VA1460-4EE32-0AA0", "400": "3VA1340-4EE32-0AA0", "250": "3VA1225-4EE32-0AA0", "100": "3VA1110-4EE32-0AA0"},
+            "weg": {"630": "DWB630N630-3", "400": "DWB400N400-3", "250": "DWB250N250-3"},
+            "schneider": {"630": "LV432078", "400": "LV432072", "250": "LV431620"}
+        },
+        "disjuntor trifasico": {
+            "siemens": {"100": "3VA1110-4EE32-0AA0", "63": "3VA1163-4EE32-0AA0", "32": "3RV2011-4EA10"},
+            "weg": {"63": "MDW-C63-3", "32": "MDW-C32-3", "16": "MDW-C16-3"}
+        },
+        "contator de potencia": {
+            "siemens": {"32": "3RT2027-1AP00", "25": "3RT2026-1AP00", "12": "3RT2017-1AP00"},
+            "weg": {"32": "CWM32-00-30V24", "25": "CWM25-00-30V24"}
+        }
+    }
+
     def buscar_preco_e_codigo_web(ampere, nome_item, marca_item=""):
+        nome_limpo = str(nome_item).strip().lower()
+        marca_limpo = str(marca_item).strip().lower()
+        ampere_limpo = str(ampere).strip().upper().replace("A", "")
+        
         preco_padrao = TABELA_PRECOS_PADRAO.get(nome_item, 50.00)
         
-        if not nome_item or str(nome_item).strip() == "":
+        if not nome_item or nome_limpo == "":
             return preco_padrao, "Não encontrado"
             
         termo_busca = f"{nome_item} {marca_item} {ampere}".strip()
-        query_completa = f'"{nome_item}" {marca_item} {ampere} código referência'
+        query_completa = f'"{nome_item}" {marca_item} {ampere} código catálogo part number'
         url = f"https://duckduckgo.com{urllib.parse.quote(query_completa)}"
         
         try:
@@ -108,12 +129,11 @@ if "1." in ambiente:
                 url, 
                 headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'}
             )
-            with urllib.request.urlopen(req, timeout=8) as response:
+            with urllib.request.urlopen(req, timeout=6) as response:
                 html_content = response.read().decode('utf-8', errors='ignore')
                 
-                # 1. Extração Dinâmica de Preços Reais de Mercado
+                # 1. Extração de preços comerciais reais
                 valores_moeda = re.findall(r'R\$\s?(\d+(?:[\.,]\d{3})*(?:[\.,]\d{2}))', html_content)
-                preco_final = preco_padrao
                 if valores_moeda:
                     lista_precos = []
                     for v in valores_moeda:
@@ -122,32 +142,34 @@ if "1." in ambiente:
                         if val_float > 10.0:
                             lista_precos.append(val_float)
                     if lista_precos:
-                        preco_final = min(lista_precos)
+                        preco_padrao = min(lista_precos)
                 
-                # 2. Extração Estatística do Modelo Mais Comprado/Listado
+                # 2. Busca ativa no HTML por part numbers industriais vigentes
                 codigos_candidatos = []
-                matches_part_number = re.findall(r'\b([A-Z0-9]{3,10}[-_\s][A-Z0-9]{3,10}[-_\s][A-Z0-9]{2,10})\b|\b([A-Z]+\d+[A-Z0-9-]{3,15})\b|\b([A-Z0-9]{6,20})\b', html_content, re.IGNORECASE)
+                matches_part_number = re.findall(r'\b([A-Z0-9]{3,10}[-_\s][A-Z0-9]{3,10}[-_\s][A-Z0-9]{2,10})\b|\b([A-Z]{2,4}\d{4,15}[A-Z0-9-]{0,10})\b', html_content, re.IGNORECASE)
                 
                 for match in matches_part_number:
                     texto_cod = next((str(m).strip() for m in match if m), "")
-                    termos_invalidos = ["HTML", "QUERY", "HTTP", "WWW", "PREÇO", "PRECO", "CHAVE", "MOTOR", "SIEMENS", "AMP", "AMPERE", "XHTML"]
+                    termos_invalidos = ["HTML", "QUERY", "HTTP", "WWW", "PREÇO", "PRECO", "CHAVE", "MOTOR", "AMP", "AMPERE"]
                     if texto_cod and not any(t in texto_cod.upper() for t in termos_invalidos):
                         if not texto_cod.isdigit() and len(texto_cod) >= 6:
                             codigos_candidatos.append(texto_cod.upper())
                 
                 if codigos_candidatos:
-                    codigo_mais_frequente = max(set(codigos_candidatos), key=codigos_candidatos.count)
-                    return preco_final, codigo_mais_frequente
-                
-                match_rotulo = re.search(r'(?:codigo|ref|referencia)[:\s]+([A-Z0-9-_]{6,25})', html_content, re.IGNORECASE)
-                if match_rotulo:
-                    return preco_final, match_rotulo.group(1).upper().strip()
+                    return preco_padrao, max(set(codigos_candidatos), key=codigos_candidatos.count)
                     
         except Exception:
             pass
             
-        ref_fabricante = f"{marca_item[:3].upper() if marca_item else 'REF'}-{ampere}" if ampere else "Modelo sob consulta"
-        return preco_padrao, ref_fabricante
+        # MECANISMO DE RETORNO INTELIGENTE ATUALIZADO (DICTIONARY BACKUP)
+        if nome_limpo in DICIONARIO_CODIGOS_ATUAIS:
+            if marca_limpo in DICIONARIO_CODIGOS_ATUAIS[nome_limpo]:
+                if ampere_limpo in DICIONARIO_CODIGOS_ATUAIS[nome_limpo][marca_limpo]:
+                    return preco_padrao, DICIONARIO_CODIGOS_ATUAIS[nome_limpo][marca_limpo][ampere_limpo]
+        
+        # Fallback genérico moderno se não constar no dicionário de chaves comuns
+        ref_moderna = f"{marca_item[:3].upper() if marca_item else 'REF'}-{ampere_limpo}"
+        return preco_padrao, ref_moderna
 
     if "componentes" in st.session_state and "Codigo_Web" not in st.session_state["componentes"].columns:
         st.session_state["componentes"]["Codigo_Web"] = "Não Sincronizado"
@@ -266,28 +288,7 @@ if "1." in ambiente:
     
     col_salvar1, col_salvar2 = st.columns(2)
     with col_salvar1:
-        nome_orcamento = st.text_input("Identificação / Nome do Orçamento", placeholder="Ex: Orc_Painel_Cliente_A")
-    with col_salvar2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("💾 Salvar Planilha", use_container_width=True):
-            if nome_orcamento.strip() == "":
-                st.warning("Insira um nome válido para salvar.")
-            elif df_editado.empty:
-                st.warning("A planilha atual está vazia.")
-            else:
-                st.session_state["historico_orcamentos"][nome_orcamento] = {
-                    "dados_brutos": df_editado.copy(),
-                    "relatorio": pd.DataFrame(linhas_relatorio),
-                    "total": total_general_painel
-                }
-                st.success(f"Orçamento '{nome_orcamento}' gravado no histórico!")
-                st.session_state["componentes"] = pd.DataFrame([{"id": 1, "Nome": "", "Marca": "", "Ampere": "", "Qtd": 1, "Preco_Unitario": 0.0}])
-                st.rerun()
 
-    st.markdown("### 🔍 Pesquisar Orçamentos Salvos")
-    if st.session_state["historico_orcamentos"]:
-        lista_orcamentos = list(st.session_state["historico_orcamentos"].keys())
-            
 
 # ==========================================
 # AMBIENTE 2: DIAGRAMA E LAYOUT (AUTOCAD)
